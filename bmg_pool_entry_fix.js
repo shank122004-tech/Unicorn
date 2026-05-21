@@ -782,13 +782,514 @@
 
 
   /* ════════════════════════════════════════════════════════════════
+   *  FIX 5 — Owner QR scanner: verify swimming pool entry passes
+   *
+   *  ROOT CAUSE: processVerifiedQRCode() only queries COLLECTIONS.BOOKINGS
+   *  (ground bookings). Pool QR codes have { type:'pool' } and no
+   *  validFrom/validTo timestamps, so they fail at SECURITY CHECK 2
+   *  ("QR Code is not valid yet") before ever reaching the DB query.
+   *
+   *  FIX: Patch processVerifiedQRCode to detect type:'pool' first and
+   *  route to a dedicated pool verifier that:
+   *    1. Skips timestamp checks (pool passes have no validFrom/validTo)
+   *    2. Queries pool_bookings by bookingId
+   *    3. Verifies the owner owns the pool (swimming_pools.ownerId)
+   *    4. Confirms booking status and marks entryStatus:'used'
+   *    5. Shows the same professional verification result modal
+   * ════════════════════════════════════════════════════════════════*/
+
+  async function verifyPoolEntryQR(qrObject) {
+    var db = window.db;
+    var currentUser = window.currentUser || (window.auth && window.auth.currentUser);
+
+    if (!currentUser) {
+      throw new Error('Please log in to verify pool entries');
+    }
+
+    var bookingId = qrObject.bookingId || qrObject.orderId;
+    if (!bookingId) {
+      throw new Error('Invalid pool QR code — missing booking ID');
+    }
+
+    // ── Find the pool booking ─────────────────────────────────
+    var poolBookingDoc = null;
+
+    // Try by doc ID first (orderId is used as doc ID)
+    try {
+      var byId = await db.collection('pool_bookings').doc(bookingId).get();
+      if (byId.exists) poolBookingDoc = byId;
+    } catch(e) { /* permission or not found */ }
+
+    // Try by bookingId field
+    if (!poolBookingDoc) {
+      try {
+        var byField = await db.collection('pool_bookings')
+          .where('bookingId', '==', bookingId)
+          .get();
+        if (!byField.empty) poolBookingDoc = byField.docs[0];
+      } catch(e) { /* ignore */ }
+    }
+
+    // Try by orderId field
+    if (!poolBookingDoc) {
+      try {
+        var byOrder = await db.collection('pool_bookings')
+          .where('orderId', '==', bookingId)
+          .get();
+        if (!byOrder.empty) poolBookingDoc = byOrder.docs[0];
+      } catch(e) { /* ignore */ }
+    }
+
+    if (!poolBookingDoc || !poolBookingDoc.exists) {
+      throw new Error('Pool booking not found. Please check the booking ID.');
+    }
+
+    var booking = poolBookingDoc.data();
+
+    // ── Verify owner owns this pool ───────────────────────────
+    var poolId = booking.poolId || qrObject.poolId;
+    if (poolId) {
+      try {
+        var poolDoc = await db.collection('swimming_pools').doc(poolId).get();
+        if (poolDoc.exists && poolDoc.data().ownerId !== currentUser.uid) {
+          throw new Error('You can only verify entries for your own pools');
+        }
+      } catch(e) {
+        if (e.message.indexOf('your own pools') !== -1) throw e;
+        // If we can't read the pool doc (permissions), allow owner identified by booking.ownerId
+        if (booking.ownerId && booking.ownerId !== currentUser.uid) {
+          throw new Error('You can only verify entries for your own pools');
+        }
+      }
+    } else if (booking.ownerId && booking.ownerId !== currentUser.uid) {
+      throw new Error('You can only verify entries for your own pools');
+    }
+
+    // ── Check booking status ──────────────────────────────────
+    var status = booking.status || booking.bookingStatus || '';
+    if (status !== 'confirmed') {
+      throw new Error('Pool booking is not confirmed. Current status: ' + (status || 'unknown'));
+    }
+
+    // ── Check date ────────────────────────────────────────────
+    var today = new Date().toISOString().split('T')[0];
+    if (booking.date && booking.date !== today) {
+      throw new Error('This pool pass is for ' + booking.date + '. Today is ' + today + '.');
+    }
+
+    // ── Check if already used ─────────────────────────────────
+    if (booking.entryStatus === 'used') {
+      throw new Error('This pool pass has already been used for entry');
+    }
+
+    // ── Mark as used ──────────────────────────────────────────
+    var updateData = {
+      entryStatus  : 'used',
+      entryTime    : firebase.firestore.FieldValue.serverTimestamp(),
+      verifiedBy   : currentUser.uid,
+      verifiedByName: currentUser.ownerName || currentUser.name || 'Owner',
+      verifiedAt   : firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt    : firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    await poolBookingDoc.ref.update(updateData);
+
+    // ── Build result object compatible with showVerificationResult ──
+    return {
+      isPool       : true,
+      userName     : booking.userName || booking.name || 'Guest',
+      userPhone    : booking.userPhone || booking.phone || '',
+      bookingId    : booking.bookingId || booking.orderId || poolBookingDoc.id,
+      date         : booking.date || today,
+      slotTime     : booking.slotTime || booking.slot || '',
+      amount       : booking.amount || 0,
+      poolName     : booking.poolName || 'Swimming Pool',
+      currentMembers: booking.currentMembers,
+      maxMembers   : booking.maxMembers,
+      entryTime    : new Date()
+    };
+  }
+
+
+  /* ── Patch processVerifiedQRCode to handle pool type ─────────── */
+  function patchProcessVerifiedQRCode() {
+    var original = window.processVerifiedQRCode;
+    if (!original || original._poolPatched) return;
+
+    window.processVerifiedQRCode = async function(qrData) {
+      // Try to parse and detect pool type
+      var qrObject;
+      try { qrObject = JSON.parse(qrData); } catch(e) { qrObject = null; }
+
+      // Route pool QR codes to our pool verifier
+      if (qrObject && (qrObject.type === 'pool' || qrObject.type === 'pool_booking')) {
+        var showVerification = window.showVerificationResult;
+        var closeScannerFn  = window.closeProfessionalQRScanner;
+
+        try {
+          // Validate app ID
+          if (!qrObject.appId || qrObject.appId !== 'BookMyGame') {
+            throw new Error('This QR code was not generated by BookMyGame');
+          }
+
+          var poolBooking = await verifyPoolEntryQR(qrObject);
+
+          // Close scanner
+          if (typeof closeScannerFn === 'function') closeScannerFn();
+
+          // Show success using the existing showVerificationResult, but with pool data
+          if (typeof showVerification === 'function') {
+            // Adapt to the ground booking shape expected by showVerificationResult
+            var fakeBooking = {
+              userName   : poolBooking.userName,
+              userPhone  : poolBooking.userPhone,
+              bookingId  : poolBooking.bookingId,
+              date       : poolBooking.date,
+              slotTime   : poolBooking.slotTime,
+              amount     : poolBooking.amount,
+              entryTime  : { toDate: function() { return poolBooking.entryTime; } },
+              _isPool    : true,
+              _poolName  : poolBooking.poolName
+            };
+            showVerification(true, fakeBooking);
+          } else {
+            _showPoolVerificationSuccess(poolBooking);
+          }
+
+        } catch(err) {
+          console.error('[pool-fix] Pool QR verification error:', err);
+          if (typeof closeScannerFn === 'function') closeScannerFn();
+          if (typeof showVerification === 'function') {
+            showVerification(false, null, err.message);
+          } else {
+            if (typeof window.showToast === 'function') window.showToast('Verification failed: ' + err.message, 'error');
+          }
+        }
+
+        return; // handled
+      }
+
+      // Not a pool QR — fall through to original ground verification
+      return original.apply(this, arguments);
+    };
+
+    window.processVerifiedQRCode._poolPatched = true;
+    console.log('[pool-fix] FIX 5: processVerifiedQRCode patched for pool QR verification');
+  }
+
+  // Fallback success UI if showVerificationResult not available
+  function _showPoolVerificationSuccess(booking) {
+    var modal = document.getElementById('verification-result-modal');
+    var body  = document.getElementById('verification-result-body');
+    var title = document.getElementById('result-title');
+    var sub   = document.getElementById('bmg-verify-subtitle');
+    var hdr   = document.getElementById('verification-result-header');
+
+    if (hdr)   hdr.className = 'bmg-verify-header';
+    if (title) title.textContent = '🏊 Pool Entry Verified!';
+    if (sub)   sub.textContent  = 'Access Authorized ✓';
+
+    if (body) {
+      var time = booking.entryTime ? booking.entryTime.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' }) : '';
+      body.innerHTML =
+        '<div class="booking-detail-card success-card">' +
+          '<div class="success-animation"><i class="fas fa-check-circle"></i></div>' +
+          '<h4>Pool Entry Allowed</h4>' +
+          '<p>Verified at ' + time + '</p>' +
+        '</div>' +
+        '<div class="booking-detail-card">' +
+          '<div class="detail-row"><i class="fas fa-user"></i><div>' +
+            '<span class="detail-label">Customer</span>' +
+            '<span class="detail-value">' + (booking.userName || 'N/A') + '</span>' +
+          '</div></div>' +
+          '<div class="detail-row"><i class="fas fa-swimmer"></i><div>' +
+            '<span class="detail-label">Pool</span>' +
+            '<span class="detail-value">' + (booking.poolName || 'Swimming Pool') + '</span>' +
+          '</div></div>' +
+          '<div class="detail-row"><i class="fas fa-clock"></i><div>' +
+            '<span class="detail-label">Time Slot</span>' +
+            '<span class="detail-value">' + (booking.slotTime || 'N/A') + '</span>' +
+          '</div></div>' +
+        '</div>';
+    }
+
+    if (modal) {
+      modal.classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+  }
+
+
+  /* ════════════════════════════════════════════════════════════════
+   *  FIX 6 — Professional, compact QR scanner UI
+   *
+   *  The scanner modal opens full-screen on mobile because:
+   *    - .modal fills 100vw/100vh
+   *    - .qr-scanner-container has no max-height
+   *    - #professional-qr-reader has min-height:400px
+   *
+   *  We inject CSS overrides to make the scanner a compact bottom-sheet
+   *  style card: max 480px wide, max 90vh tall, centered, with a proper
+   *  camera window that's square and sized to fit the screen neatly.
+   * ════════════════════════════════════════════════════════════════*/
+  function injectScannerUI() {
+    if (document.getElementById('bmg-scanner-pro-css')) return;
+    var style = document.createElement('style');
+    style.id = 'bmg-scanner-pro-css';
+    style.textContent = [
+      /* ── Modal backdrop ── */
+      '#professional-qr-modal {',
+        'display: none;',
+        'position: fixed !important;',
+        'inset: 0 !important;',
+        'background: rgba(0,0,0,0.75) !important;',
+        'backdrop-filter: blur(4px) !important;',
+        '-webkit-backdrop-filter: blur(4px) !important;',
+        'z-index: 10000 !important;',
+        'align-items: flex-end !important;',
+        'justify-content: center !important;',
+        'padding: 0 !important;',
+      '}',
+      '#professional-qr-modal[style*="flex"] {',
+        'display: flex !important;',
+      '}',
+
+      /* ── Scanner card (bottom-sheet) ── */
+      '#professional-qr-modal .qr-scanner-container {',
+        'width: 100% !important;',
+        'max-width: 480px !important;',
+        'max-height: 92vh !important;',
+        'background: #0a0a0f !important;',
+        'border-radius: 28px 28px 0 0 !important;',
+        'overflow: hidden !important;',
+        'display: flex !important;',
+        'flex-direction: column !important;',
+        'animation: bmgSheetUp 0.32s cubic-bezier(0.32,0.72,0,1) both !important;',
+        'position: relative !important;',
+      '}',
+      '@keyframes bmgSheetUp {',
+        'from { transform: translateY(60px); opacity: 0; }',
+        'to   { transform: translateY(0);    opacity: 1; }',
+      '}',
+
+      /* Pull handle */
+      '#professional-qr-modal .qr-scanner-container::before {',
+        'content: "" !important;',
+        'display: block !important;',
+        'width: 40px !important;',
+        'height: 4px !important;',
+        'background: rgba(255,255,255,0.2) !important;',
+        'border-radius: 2px !important;',
+        'margin: 10px auto 0 !important;',
+        'flex-shrink: 0 !important;',
+      '}',
+
+      /* ── Header ── */
+      '#professional-qr-modal .qr-scanner-header {',
+        'padding: 14px 18px 14px !important;',
+        'background: transparent !important;',
+        'border-bottom: 1px solid rgba(255,255,255,0.08) !important;',
+        'flex-shrink: 0 !important;',
+      '}',
+      '#professional-qr-modal .scanner-icon {',
+        'width: 38px !important;',
+        'height: 38px !important;',
+        'border-radius: 10px !important;',
+        'background: rgba(99,102,241,0.25) !important;',
+        'border: 1px solid rgba(99,102,241,0.4) !important;',
+      '}',
+      '#professional-qr-modal .scanner-icon i {',
+        'font-size: 1.1rem !important;',
+        'color: #818cf8 !important;',
+      '}',
+      '#professional-qr-modal .scanner-header-content h3 {',
+        'font-size: 15px !important;',
+        'font-weight: 700 !important;',
+        'color: #f8fafc !important;',
+        'margin: 0 !important;',
+      '}',
+      '#professional-qr-modal .scanner-header-content p {',
+        'font-size: 11px !important;',
+        'color: rgba(255,255,255,0.45) !important;',
+        'margin: 2px 0 0 !important;',
+      '}',
+      '#professional-qr-modal .close-scanner-btn {',
+        'width: 36px !important;',
+        'height: 36px !important;',
+        'border-radius: 50% !important;',
+        'background: rgba(255,255,255,0.08) !important;',
+        'border: 1px solid rgba(255,255,255,0.12) !important;',
+        'color: #94a3b8 !important;',
+        'font-size: 14px !important;',
+      '}',
+
+      /* ── Camera viewport ── */
+      '#professional-qr-modal .scanner-viewport {',
+        'position: relative !important;',
+        'width: 100% !important;',
+        'height: 260px !important;',
+        'min-height: unset !important;',
+        'max-height: 260px !important;',
+        'background: #000 !important;',
+        'overflow: hidden !important;',
+        'flex-shrink: 0 !important;',
+      '}',
+      '#professional-qr-modal #professional-qr-reader {',
+        'width: 100% !important;',
+        'height: 260px !important;',
+        'min-height: unset !important;',
+        'max-height: 260px !important;',
+        'overflow: hidden !important;',
+      '}',
+
+      /* Force html5-qrcode video to fill neatly */
+      '#professional-qr-reader video {',
+        'width: 100% !important;',
+        'height: 260px !important;',
+        'object-fit: cover !important;',
+      '}',
+      '#professional-qr-reader img { display: none !important; }',
+
+      /* ── Scan frame overlay ── */
+      '#professional-qr-modal .scanner-overlay {',
+        'z-index: 2 !important;',
+      '}',
+      '#professional-qr-modal .scan-frame {',
+        'width: 180px !important;',
+        'height: 180px !important;',
+        'position: relative !important;',
+      '}',
+
+      /* Dim outside the frame */
+      '#professional-qr-modal .scanner-overlay::before {',
+        'content: "" !important;',
+        'position: absolute !important;',
+        'inset: 0 !important;',
+        'background: rgba(0,0,0,0.45) !important;',
+        'mask: url(\'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"><defs><mask id="m"><rect width="100%" height="100%" fill="white"/><rect x="50%" y="50%" width="180" height="180" transform="translate(-90,-90)" rx="16" fill="black"/></mask></defs><rect width="100%" height="100%" fill="white" mask="url(%23m)"/></svg>\') !important;',
+        'pointer-events: none !important;',
+      '}',
+
+      '#professional-qr-modal .scan-corner {',
+        'width: 22px !important;',
+        'height: 22px !important;',
+        'border-width: 3px !important;',
+        'border-color: #6366f1 !important;',
+      '}',
+      '#professional-qr-modal .scan-line {',
+        'background: linear-gradient(90deg, transparent, #6366f1, transparent) !important;',
+        'height: 2px !important;',
+        'box-shadow: 0 0 8px rgba(99,102,241,0.8) !important;',
+      '}',
+
+      /* ── Status bar below camera ── */
+      '#professional-qr-modal .scanner-status-bar {',
+        'text-align: center !important;',
+        'padding: 10px 16px 6px !important;',
+        'font-size: 12px !important;',
+        'font-weight: 600 !important;',
+        'color: rgba(255,255,255,0.5) !important;',
+        'letter-spacing: 0.4px !important;',
+        'flex-shrink: 0 !important;',
+      '}',
+
+      /* ── Controls ── */
+      '#professional-qr-modal .scanner-controls {',
+        'display: flex !important;',
+        'gap: 10px !important;',
+        'padding: 10px 16px 14px !important;',
+        'background: transparent !important;',
+        'flex-shrink: 0 !important;',
+      '}',
+      '#professional-qr-modal .scanner-btn {',
+        'flex: 1 !important;',
+        'padding: 10px 8px !important;',
+        'border-radius: 12px !important;',
+        'font-size: 11px !important;',
+        'font-weight: 700 !important;',
+        'letter-spacing: 0.3px !important;',
+        'border: 1px solid rgba(255,255,255,0.1) !important;',
+        'transition: all .2s !important;',
+      '}',
+      '#professional-qr-modal .scanner-btn.torch-btn {',
+        'background: rgba(251,191,36,0.12) !important;',
+        'color: #fbbf24 !important;',
+        'border-color: rgba(251,191,36,0.25) !important;',
+      '}',
+      '#professional-qr-modal .scanner-btn.torch-btn.active {',
+        'background: rgba(251,191,36,0.25) !important;',
+        'box-shadow: 0 0 16px rgba(251,191,36,0.3) !important;',
+      '}',
+      '#professional-qr-modal .scanner-btn.gallery-btn {',
+        'background: rgba(99,102,241,0.12) !important;',
+        'color: #818cf8 !important;',
+        'border-color: rgba(99,102,241,0.25) !important;',
+      '}',
+      '#professional-qr-modal .scanner-btn.close-btn {',
+        'background: rgba(239,68,68,0.1) !important;',
+        'color: #f87171 !important;',
+        'border-color: rgba(239,68,68,0.2) !important;',
+      '}',
+      '#professional-qr-modal .scanner-btn:hover {',
+        'filter: brightness(1.15) !important;',
+        'transform: translateY(-1px) !important;',
+      '}',
+
+      /* ── Result area ── */
+      '#professional-qr-result {',
+        'flex-shrink: 0 !important;',
+      '}',
+      '#professional-qr-result:not(:empty) {',
+        'padding: 12px 16px !important;',
+        'border-top: 1px solid rgba(255,255,255,0.08) !important;',
+      '}',
+
+      /* ── Pool type badge in scanner header ── */
+      '.bmg-scanner-pool-badge {',
+        'font-size: 10px;',
+        'font-weight: 700;',
+        'padding: 3px 9px;',
+        'border-radius: 20px;',
+        'background: rgba(14,165,233,0.15);',
+        'border: 1px solid rgba(14,165,233,0.3);',
+        'color: #38bdf8;',
+        'margin-left: 6px;',
+        'vertical-align: middle;',
+      '}',
+    ].join('\n');
+    document.head.appendChild(style);
+
+    /* ── Inject status hint bar into scanner DOM ── */
+    var viewport = document.querySelector('#professional-qr-modal .scanner-viewport');
+    if (viewport && !document.querySelector('.scanner-status-bar')) {
+      var bar = document.createElement('div');
+      bar.className = 'scanner-status-bar';
+      bar.textContent = 'Hold QR code steady within the frame';
+      viewport.parentNode.insertBefore(bar, viewport.nextSibling);
+    }
+
+    console.log('[pool-fix] FIX 6: Professional compact scanner UI injected');
+  }
+
+
+  /* ════════════════════════════════════════════════════════════════
    *  Boot
    * ════════════════════════════════════════════════════════════════*/
   injectPoolSlotCSS();
+  injectScannerUI();
 
   // Patch after app.js is ready
-  _waitFor('showEntryPass',    patchShowEntryPass);
-  _waitFor('loadUserBookings', patchLoadUserBookings);
+  _waitFor('showEntryPass',            patchShowEntryPass);
+  _waitFor('loadUserBookings',         patchLoadUserBookings);
+  _waitFor('processVerifiedQRCode',    patchProcessVerifiedQRCode);
+
+  // Re-inject scanner UI whenever the scanner modal opens (in case DOM was reset)
+  window.addEventListener('bmg:pageShown', function() { injectScannerUI(); });
+  document.addEventListener('click', function(e) {
+    if (e.target && (e.target.id === 'header-qr-scanner' || e.target.closest('#header-qr-scanner'))) {
+      setTimeout(injectScannerUI, 80);
+    }
+  });
 
   // Do NOT overwrite showPoolEntryPass — bmg_swimming_pool_fix.js (loaded before us)
   // sets the definitive 1-arg version. Only expose ours as a 2-arg fallback.
@@ -798,6 +1299,6 @@
     window._showPoolEntryPass2arg = showPoolEntryPass; // keep 2-arg version accessible
   }
 
-  console.log('✅ [bmg_pool_entry_fix.js] Loaded — pool entry pass, water park theme, member counts active');
+  console.log('✅ [bmg_pool_entry_fix.js] Loaded — pool QR verification + compact scanner UI active');
 
 })();
