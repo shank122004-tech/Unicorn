@@ -65,7 +65,17 @@
         localStorage.setItem(LS_KEY,      activeCity);
         localStorage.setItem(LS_DISP_KEY, activeCityDisplay);
         updateCityBar();
+        /* Ensure loaders are patched before reloading, then trigger refresh */
+        patchLoaders();
         reloadHome();
+        /* Also reload the pool section directly in case loadMainPage doesn't cover it */
+        if (typeof window.loadBmgPoolSection === 'function') {
+            setTimeout(function () {
+                window.loadBmgPoolSection().catch(function (e) {
+                    console.warn('[city-filter] pool reload error:', e);
+                });
+            }, 120);
+        }
     }
 
     function loadCityFromStorage() {
@@ -188,7 +198,15 @@
             localStorage.removeItem(LS_DISP_KEY);
             closeCityModal();
             updateCityBar();
+            patchLoaders();
             reloadHome();
+            if (typeof window.loadBmgPoolSection === 'function') {
+                setTimeout(function () {
+                    window.loadBmgPoolSection().catch(function (e) {
+                        console.warn('[city-filter] pool reload error:', e);
+                    });
+                }, 120);
+            }
         });
 
         var searchInput = document.getElementById('bmg-city-search-input');
@@ -3590,6 +3608,20 @@
                 <div style="font-size:12px;color:#6b7280;">
                   <i class="fas fa-rupee-sign" style="color:#0ea5e9;width:14px;"></i> ₹${esc(pool.pricePerSession || 0)}/session
                 </div>
+                <div style="font-size:12px;color:#6b7280;margin-top:2px;">
+                  <i class="fas fa-clock" style="color:#0ea5e9;width:14px;"></i>
+                  ${esc(pool.openTime || '06:00')} – ${esc(pool.closeTime || '21:00')}
+                  &nbsp;·&nbsp;<i class="fas fa-users" style="color:#0ea5e9;"></i> ${esc(pool.capacityPerSession || pool.capacity || '—')} per session
+                </div>
+              </div>
+              <div style="padding:0 14px 14px;display:flex;gap:8px;">
+                <button class="bmgp-owner-edit-pool-btn"
+                  data-pool-id="${esc(pool.id)}"
+                  style="flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;
+                         padding:9px 14px;background:linear-gradient(135deg,#0369a1,#0ea5e9);
+                         color:#fff;border:none;border-radius:22px;font-size:13px;font-weight:700;cursor:pointer;">
+                  <i class="fas fa-edit"></i> Manage Pool
+                </button>
               </div>
             </div>`;
         });
@@ -3597,6 +3629,15 @@
 
       container.innerHTML = html;
       spinStop();
+
+      /* Bind edit buttons */
+      container.querySelectorAll('.bmgp-owner-edit-pool-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var poolId = btn.getAttribute('data-pool-id');
+          var pool   = pools.find(function (p) { return p.id === poolId; });
+          if (pool) showEditPoolModal(pool);
+        });
+      });
 
       /* Bind add buttons */
       ['bmgp-add-pool-btn','bmgp-add-pool-btn-empty'].forEach(function (id) {
@@ -3611,6 +3652,247 @@
       console.error(e);
       container.innerHTML = '<p style="text-align:center;color:#ef4444;">Failed to load pools</p>';
     }
+  }
+
+  /* ── EDIT POOL MODAL ── */
+  function showEditPoolModal(pool) {
+    var existing = document.getElementById('bmgp-edit-pool-modal');
+    if (existing) existing.remove();
+
+    var modal = document.createElement('div');
+    modal.id = 'bmgp-edit-pool-modal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(10,20,60,0.6);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:flex;align-items:flex-end;z-index:9999;opacity:0;pointer-events:none;transition:opacity .25s;';
+    modal.innerHTML = `
+      <div id="bmgp-edit-pool-sheet"
+        style="background:#fff;border-radius:24px 24px 0 0;width:100%;max-height:90vh;overflow-y:auto;
+               transform:translateY(100%);transition:transform .35s cubic-bezier(.4,0,.2,1);-webkit-overflow-scrolling:touch;">
+        <div style="width:40px;height:4px;border-radius:2px;background:#e2e8f0;margin:10px auto 0;"></div>
+
+        <!-- Header -->
+        <div style="display:flex;align-items:center;justify-content:space-between;
+                    padding:16px 18px 12px;border-bottom:1px solid #f0f4ff;
+                    position:sticky;top:0;background:#fff;z-index:10;">
+          <div style="font-size:16px;font-weight:800;color:#0f1f5c;display:flex;align-items:center;gap:8px;">
+            <i class="fas fa-swimming-pool" style="color:#0ea5e9;"></i> Manage Pool
+          </div>
+          <button id="bmgp-edit-pool-close"
+            style="width:34px;height:34px;border-radius:50%;background:#f0f4ff;border:none;
+                   color:#374151;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+
+        <div style="padding:18px;">
+
+          <!-- Pool Name -->
+          <div style="margin-bottom:14px;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:#374151;margin-bottom:7px;">
+              <i class="fas fa-tag" style="color:#0ea5e9;"></i> Pool Name
+            </label>
+            <input type="text" id="bmgp-edit-pool-name"
+              value="${esc(pool.name || '')}"
+              placeholder="Pool name"
+              style="width:100%;padding:11px 14px;border-radius:12px;border:2px solid #e8edf8;
+                     font-size:14px;font-family:inherit;color:#0f1f5c;background:#f8faff;
+                     outline:none;box-sizing:border-box;">
+          </div>
+
+          <!-- Price / Contact row -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+            <div>
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:#374151;margin-bottom:7px;">
+                <i class="fas fa-rupee-sign" style="color:#0ea5e9;"></i> Price/Session (₹)
+              </label>
+              <input type="number" id="bmgp-edit-pool-price"
+                value="${esc(pool.pricePerSession || 0)}"
+                min="1" max="9999" placeholder="200"
+                style="width:100%;padding:11px 14px;border-radius:12px;border:2px solid #e8edf8;
+                       font-size:14px;font-family:inherit;color:#0f1f5c;background:#f8faff;
+                       outline:none;box-sizing:border-box;">
+            </div>
+            <div>
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:#374151;margin-bottom:7px;">
+                <i class="fas fa-users" style="color:#0ea5e9;"></i> Capacity/Session
+              </label>
+              <input type="number" id="bmgp-edit-pool-capacity"
+                value="${esc(pool.capacityPerSession || pool.capacity || 30)}"
+                min="1" max="500" placeholder="30"
+                style="width:100%;padding:11px 14px;border-radius:12px;border:2px solid #e8edf8;
+                       font-size:14px;font-family:inherit;color:#0f1f5c;background:#f8faff;
+                       outline:none;box-sizing:border-box;">
+            </div>
+          </div>
+
+          <!-- Timings -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+            <div>
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:#374151;margin-bottom:7px;">
+                <i class="fas fa-clock" style="color:#0ea5e9;"></i> Opens At
+              </label>
+              <input type="time" id="bmgp-edit-pool-open"
+                value="${esc(pool.openTime || '06:00')}"
+                style="width:100%;padding:11px 14px;border-radius:12px;border:2px solid #e8edf8;
+                       font-size:14px;font-family:inherit;color:#0f1f5c;background:#f8faff;
+                       outline:none;box-sizing:border-box;">
+            </div>
+            <div>
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:#374151;margin-bottom:7px;">
+                <i class="fas fa-clock" style="color:#0ea5e9;"></i> Closes At
+              </label>
+              <input type="time" id="bmgp-edit-pool-close"
+                value="${esc(pool.closeTime || '21:00')}"
+                style="width:100%;padding:11px 14px;border-radius:12px;border:2px solid #e8edf8;
+                       font-size:14px;font-family:inherit;color:#0f1f5c;background:#f8faff;
+                       outline:none;box-sizing:border-box;">
+            </div>
+          </div>
+
+          <!-- Pool Length -->
+          <div style="margin-bottom:14px;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:#374151;margin-bottom:7px;">
+              <i class="fas fa-ruler" style="color:#0ea5e9;"></i> Pool Length (metres)
+            </label>
+            <input type="number" id="bmgp-edit-pool-length"
+              value="${esc(pool.poolLength || '')}"
+              min="1" max="200" placeholder="25"
+              style="width:100%;padding:11px 14px;border-radius:12px;border:2px solid #e8edf8;
+                     font-size:14px;font-family:inherit;color:#0f1f5c;background:#f8faff;
+                     outline:none;box-sizing:border-box;">
+          </div>
+
+          <!-- Contact Phone -->
+          <div style="margin-bottom:14px;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:#374151;margin-bottom:7px;">
+              <i class="fas fa-phone" style="color:#0ea5e9;"></i> Contact Number
+            </label>
+            <input type="tel" id="bmgp-edit-pool-phone"
+              value="${esc(pool.contactPhone || pool.ownerPhone || '')}"
+              maxlength="10" pattern="[6-9][0-9]{9}" placeholder="10-digit number"
+              style="width:100%;padding:11px 14px;border-radius:12px;border:2px solid #e8edf8;
+                     font-size:14px;font-family:inherit;color:#0f1f5c;background:#f8faff;
+                     outline:none;box-sizing:border-box;">
+          </div>
+
+          <!-- Description -->
+          <div style="margin-bottom:14px;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:#374151;margin-bottom:7px;">
+              <i class="fas fa-align-left" style="color:#0ea5e9;"></i> Description
+            </label>
+            <textarea id="bmgp-edit-pool-description" rows="3"
+              placeholder="Brief description…"
+              style="width:100%;padding:11px 14px;border-radius:12px;border:2px solid #e8edf8;
+                     font-size:14px;font-family:inherit;color:#0f1f5c;background:#f8faff;
+                     outline:none;box-sizing:border-box;resize:none;">${esc(pool.description || '')}</textarea>
+          </div>
+
+          <!-- Amenities -->
+          <div style="margin-bottom:18px;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:#374151;margin-bottom:10px;">
+              <i class="fas fa-star" style="color:#0ea5e9;"></i> Amenities
+            </label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              ${['Changing Rooms','Lockers','Coach Available','Parking','Cafe / Canteen','Lifeguard','Kids Pool','Heated Pool'].map(function(a) {
+                var key = a.toLowerCase().replace(/[^a-z]/g,'_');
+                var checked = pool.amenities && pool.amenities.indexOf(a) !== -1 ? 'checked' : '';
+                return `<label style="display:flex;align-items:center;gap:7px;font-size:13px;color:#374151;cursor:pointer;">
+                  <input type="checkbox" id="bmgp-edit-am-${key}" value="${a}" ${checked}
+                    style="width:15px;height:15px;accent-color:#0ea5e9;cursor:pointer;">
+                  ${a}
+                </label>`;
+              }).join('')}
+            </div>
+          </div>
+
+          <!-- Save button -->
+          <button id="bmgp-edit-pool-save"
+            style="width:100%;padding:14px;background:linear-gradient(135deg,#0369a1,#0ea5e9);
+                   color:#fff;border:none;border-radius:14px;font-size:15px;font-weight:700;
+                   cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;
+                   font-family:inherit;">
+            <i class="fas fa-save"></i> Save Changes
+          </button>
+
+        </div>
+      </div>`;
+
+    document.body.appendChild(modal);
+
+    /* Animate in */
+    requestAnimationFrame(function () {
+      modal.style.opacity = '1';
+      modal.style.pointerEvents = 'all';
+      document.getElementById('bmgp-edit-pool-sheet').style.transform = 'translateY(0)';
+    });
+
+    function closeEditModal() {
+      modal.style.opacity = '0';
+      document.getElementById('bmgp-edit-pool-sheet').style.transform = 'translateY(100%)';
+      setTimeout(function () { if (modal.parentNode) modal.parentNode.removeChild(modal); }, 300);
+    }
+
+    document.getElementById('bmgp-edit-pool-close').addEventListener('click', closeEditModal);
+    modal.addEventListener('click', function (e) { if (e.target === modal) closeEditModal(); });
+
+    /* Focus styling */
+    modal.querySelectorAll('input, textarea').forEach(function (inp) {
+      inp.addEventListener('focus', function () { this.style.borderColor = '#0ea5e9'; this.style.background = '#fff'; });
+      inp.addEventListener('blur',  function () { this.style.borderColor = '#e8edf8'; this.style.background = '#f8faff'; });
+    });
+
+    /* Save */
+    document.getElementById('bmgp-edit-pool-save').addEventListener('click', async function () {
+      var saveBtn = this;
+      var name     = (document.getElementById('bmgp-edit-pool-name')?.value || '').trim();
+      var price    = parseInt(document.getElementById('bmgp-edit-pool-price')?.value || '0');
+      var capacity = parseInt(document.getElementById('bmgp-edit-pool-capacity')?.value || '0');
+      var openTime = document.getElementById('bmgp-edit-pool-open')?.value || '06:00';
+      var closeTime= document.getElementById('bmgp-edit-pool-close')?.value || '21:00';
+      var length   = parseInt(document.getElementById('bmgp-edit-pool-length')?.value || '0');
+      var phone    = (document.getElementById('bmgp-edit-pool-phone')?.value || '').trim();
+      var desc     = (document.getElementById('bmgp-edit-pool-description')?.value || '').trim();
+
+      if (!name)                { if (typeof toast === 'function') toast('Pool name is required', 'warning'); return; }
+      if (!price || price < 1)  { if (typeof toast === 'function') toast('Enter a valid price', 'warning');  return; }
+      if (!capacity || capacity < 1) { if (typeof toast === 'function') toast('Enter session capacity', 'warning'); return; }
+      if (phone && !/^[6-9][0-9]{9}$/.test(phone)) { if (typeof toast === 'function') toast('Enter a valid 10-digit phone number', 'warning'); return; }
+
+      var amenities = [];
+      ['changing_rooms','lockers','coach_available','parking','cafe___canteen',
+       'lifeguard','kids_pool','heated_pool'].forEach(function (k) {
+        var el = document.getElementById('bmgp-edit-am-' + k);
+        if (el && el.checked) amenities.push(el.value);
+      });
+
+      var updates = {
+        name:               name,
+        pricePerSession:    price,
+        capacityPerSession: capacity,
+        openTime:           openTime,
+        closeTime:          closeTime,
+        amenities:          amenities,
+        description:        desc,
+        updatedAt:          firebase.firestore.FieldValue.serverTimestamp()
+      };
+      if (length > 0)  updates.poolLength    = length;
+      if (phone)       updates.contactPhone   = phone;
+
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving…';
+
+      try {
+        await db.collection('swimming_pools').doc(pool.id).update(updates);
+        if (typeof toast === 'function') toast('Pool details updated! ✅', 'success');
+        closeEditModal();
+        /* Refresh owner pool list */
+        var container = document.getElementById('owner-dashboard-content');
+        if (container) loadOwnerPools(container);
+      } catch (err) {
+        console.error('[edit-pool]', err);
+        if (typeof toast === 'function') toast('Failed to save: ' + err.message, 'error');
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<i class="fas fa-save"></i> Save Changes';
+      }
+    });
   }
 
   /* ── ADD POOL MODAL HTML ── */
@@ -4969,4 +5251,4 @@
     boot();
   }
 
-})();
+})();s
