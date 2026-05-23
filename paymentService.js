@@ -826,7 +826,7 @@ window.recoverPaymentSession              = recoverPaymentSession;
         // ── Pool Booking earnings ─────────────────────────────────────────
         let pTodayE = 0, pWeekE = 0, pMonthE = 0, pTotalE = 0;
         const poolBookings = [];
-        poolBookingSnap.forEach(doc => {
+        (poolBookingSnap.docs || []).forEach(doc => {
           const p   = doc.data();
           const amt = p.ownerAmount || 0;
           pTotalE += amt;
@@ -893,6 +893,25 @@ window.recoverPaymentSession              = recoverPaymentSession;
         tSnap.docs.forEach(d => { totalSent += d.data().amount || 0; transfers.push({ id: d.id, ...d.data() }); });
 
         const pendingBalance = Math.max(0, totalE - totalSent);
+
+        // ── Pending Payout Requests ──────────────────────────────────────
+        const payoutSnap = await db.collection(COLLECTIONS.PAYOUT_REQUESTS || 'payout_requests')
+          .where('ownerId', '==', cu.uid)
+          .where('status', '==', 'pending')
+          .orderBy('createdAt', 'desc')
+          .get().catch(() => ({ docs: [] }));
+        const pendingPayouts = [];
+        payoutSnap.docs.forEach(d => { pendingPayouts.push({ id: d.id, ...d.data() }); });
+
+        // ── Completed Payout Requests ────────────────────────────────────
+        const completedPayoutSnap = await db.collection(COLLECTIONS.PAYOUT_REQUESTS || 'payout_requests')
+          .where('ownerId', '==', cu.uid)
+          .where('status', 'in', ['completed', 'approved'])
+          .orderBy('createdAt', 'desc')
+          .limit(10)
+          .get().catch(() => ({ docs: [] }));
+        const completedPayouts = [];
+        completedPayoutSnap.docs.forEach(d => { completedPayouts.push({ id: d.id, ...d.data() }); });
 
         // ── Build booking rows ────────────────────────────────────────────
         const bookingRows = bookings.slice(0, 30).map(b => `
@@ -997,15 +1016,95 @@ window.recoverPaymentSession              = recoverPaymentSession;
             </div>
           </div>
 
+          <!-- WITHDRAWAL SECTION -->
+          <div style="background:linear-gradient(135deg,#f97316,#ea580c);border-radius:16px;padding:20px;margin-bottom:20px;color:#fff;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+              <div>
+                <div style="font-size:14px;opacity:.9;margin-bottom:4px;"><i class="fas fa-arrow-down-to-bracket"></i> Withdraw Your Earnings</div>
+                <div style="font-size:13px;opacity:.8;">Request payout to your registered UPI ID</div>
+              </div>
+              <i class="fas fa-credit-card" style="font-size:32px;opacity:.2;"></i>
+            </div>
+            
+            <!-- Pending Payouts Alert -->
+            ${pendingPayouts.length > 0 ? `
+            <div style="background:rgba(0,0,0,.15);border-left:4px solid #fbbf24;border-radius:8px;padding:12px;margin-bottom:12px;font-size:12px;">
+              <i class="fas fa-info-circle"></i> <strong>Pending Request:</strong> You have ${pendingPayouts.length} payout request(s) being processed. Once approved, it will be transferred within 7 working days.
+            </div>
+            ` : ''}
+
+            <!-- Withdraw Button -->
+            <button onclick="showPayoutRequestModal(${pendingBalance})" style="width:100%;background:rgba(255,255,255,.25);border:2px solid rgba(255,255,255,.5);color:#fff;padding:12px 16px;border-radius:10px;font-weight:600;cursor:pointer;transition:all .3s;font-size:14px;" onmouseover="this.style.background='rgba(255,255,255,.35)'" onmouseout="this.style.background='rgba(255,255,255,.25)'">
+              <i class="fas fa-arrow-right"></i> Request Withdrawal of ${fmt(pendingBalance)}
+            </button>
+            
+            <div style="margin-top:12px;font-size:11px;opacity:.8;text-align:center;">
+              <i class="fas fa-shield-alt"></i> All transfers are secure and verified through our system
+            </div>
+          </div>
+
+          <!-- PENDING WITHDRAWALS -->
+          ${pendingPayouts.length > 0 ? `
+          <div style="margin-bottom:20px;background:#fef3c7;border-left:4px solid #f59e0b;border-radius:8px;padding:16px;">
+            <div style="font-weight:700;font-size:14px;color:#b45309;margin-bottom:12px;">
+              <i class="fas fa-hourglass-end" style="color:#f59e0b;"></i> Pending Withdrawal Requests
+            </div>
+            ${pendingPayouts.map(p => {
+              const date = p.createdAt?.toDate ? p.createdAt.toDate().toLocaleDateString('en-IN') : 'N/A';
+              return `
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(245,158,11,.2);">
+                <div>
+                  <div style="font-weight:600;font-size:13px;color:#92400e;">Withdrawal Request</div>
+                  <div style="font-size:11px;color:#b45309;margin-top:2px;"><i class="fas fa-clock"></i> Requested on ${date}</div>
+                </div>
+                <div style="text-align:right;">
+                  <div style="font-weight:700;color:#f59e0b;font-size:15px;">${fmt(p.amount || 0)}</div>
+                  <div style="font-size:10px;color:#b45309;margin-top:2px;"><span style="background:#f59e0b;color:#fff;padding:2px 8px;border-radius:12px;font-size:9px;font-weight:600;">PENDING</span></div>
+                </div>
+              </div>`;
+            }).join('')}
+          </div>
+          ` : ''}
+
           <!-- TRANSFER HISTORY -->
           ${transfers.length > 0 ? `
           <div style="margin-bottom:20px;">
             <div style="font-weight:700;font-size:15px;margin-bottom:12px;">
-              <i class="fas fa-check-circle" style="color:var(--success,#10b981);"></i> Payment History
+              <i class="fas fa-check-circle" style="color:var(--success,#10b981);"></i> Completed Withdrawals
             </div>
-            ${transferRows}
+            ${transfers.map(t => {
+              const date = t.createdAt?.toDate ? t.createdAt.toDate().toLocaleDateString('en-IN') : 'N/A';
+              return `
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--gray-100,#f3f4f6);">
+                <div>
+                  <div style="font-weight:600;font-size:13px;color:var(--gray-800);">Withdrawal Completed ✓</div>
+                  <div style="font-size:12px;color:var(--gray-500);margin-top:2px;">${date}${t.note ? ' • '+_esc(t.note) : ''}</div>
+                </div>
+                <div style="font-weight:700;color:var(--primary,#10b981);font-size:15px;">${fmt(t.amount || 0)}</div>
+              </div>`;
+            }).join('')}
           </div>` : ''}
 
+          <!-- COMPLETED PAYOUT REQUESTS -->
+          ${completedPayouts.length > 0 ? `
+          <div style="margin-bottom:20px;">
+            <div style="font-weight:700;font-size:15px;margin-bottom:12px;">
+              <i class="fas fa-check-double" style="color:#10b981;"></i> Approved Payouts
+            </div>
+            ${completedPayouts.map(p => {
+              const date = p.createdAt?.toDate ? p.createdAt.toDate().toLocaleDateString('en-IN') : 'N/A';
+              return `
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--gray-100,#f3f4f6);">
+                <div>
+                  <div style="font-weight:600;font-size:13px;color:var(--gray-800);">Payout Approved ✓</div>
+                  <div style="font-size:12px;color:var(--gray-500);margin-top:2px;">${date}</div>
+                </div>
+                <div style="font-weight:700;color:#10b981;font-size:15px;">${fmt(p.amount || 0)}</div>
+              </div>`;
+            }).join('')}
+          </div>
+          ` : ''}
+          
           <!-- BOOKING HISTORY -->
           <div style="margin-bottom:20px;">
             <div style="font-weight:700;font-size:15px;margin-bottom:12px;">
