@@ -1,0 +1,2972 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Add Cashfree SDK -->
+<script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
+
+<!-- Add WebView fix for Capacitor -->
+<script>
+    // Detect if running in Capacitor/Cordova
+    window.isNativeApp = !!(window.Capacitor || window.cordova || window.webkit);
+    
+    // Fix for Capacitor WebView
+    if (window.isNativeApp) {
+        // Allow all origins for native webview
+        document.addEventListener('deviceready', function() {
+            console.log('Running in native app mode');
+        }, false);
+    }
+</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>BookMyGame - Sports Ground Booking Platform</title>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-functions-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
+    <!-- Cashfree SDK (popup mode) — already loaded in <head> above -->
+    <!-- QR Code Generator & Scanner -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+    <!-- Save qrcode@1.5.1 (which has toDataURL) BEFORE qrcodejs overwrites window.QRCode -->
+    <script>if(window.QRCode && typeof window.QRCode.toDataURL==='function') window._QRCodeLib=window.QRCode;</script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.4/html5-qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    
+    <!-- Font Awesome 6 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="bookings_layout_patch.css">
+    <link rel="stylesheet" href="ground_page_ui_patch.css">
+    <link rel="stylesheet" href="city_filter_patch.css">
+    <link rel="stylesheet" href="owner_listing_verification_patch.css">
+    <!-- SpörtoBook Zepto-Style UI Override -->
+    
+    
+    <!-- Add these for better performance -->
+<link rel="preconnect" href="https://www.gstatic.com">
+<link rel="preconnect" href="https://firebasestorage.googleapis.com">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="dns-prefetch" href="https://www.gstatic.com">
+<link rel="dns-prefetch" href="https://firebase.googleapis.com">
+<!-- Preload critical resources -->
+<link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" as="style">
+<link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style">
+<link rel="preconnect" href="https://firestore.googleapis.com">
+<link rel="preconnect" href="https://firebase.googleapis.com">
+</head>
+<body>
+    
+    <div class="app-container">
+        <!-- SPLASH SCREEN -->
+        <div id="splash-screen" class="splash-screen">
+            <div class="splash-content">
+                <h1 class="splash-title">Spörto<span>Book</span></h1>
+                <div class="splash-benefit-cards">
+                    <div class="splash-benefit-card">
+                        <span class="benefit-icon">🏷️</span>
+                        <div class="benefit-title">NO EXTRA<br>FEES</div>
+                        <div class="benefit-sub">Transparent Pricing</div>
+                    </div>
+                    <div class="splash-benefit-card">
+                        <span class="benefit-icon">🏆</span>
+                        <div class="benefit-title">LOWEST<br>GROUNDS</div>
+                        <div class="benefit-sub">Best Prices</div>
+                    </div>
+                </div>
+                <div class="splash-sport-visual">
+                    <span class="sport-item">⚽</span>
+                    <span class="sport-item">🏏</span>
+                    <span class="sport-item">🏸</span>
+                </div>
+            </div>
+        </div>
+
+<!-- LOGIN PAGE - PREMIUM DESIGN -->
+<div id="login-page" class="page auth-page">
+    <div class="auth-container premium-auth">
+        <!-- Animated Background Elements -->
+        <div class="auth-bg-animation">
+            <div class="floating-shape shape-1"></div>
+            <div class="floating-shape shape-2"></div>
+            <div class="floating-shape shape-3"></div>
+            <div class="floating-shape shape-4"></div>
+            <div class="floating-shape shape-5"></div>
+        </div>
+        
+        <div class="auth-card">
+            <div class="auth-brand">
+                <div class="brand-logo">
+                    <i class="fas fa-futbol"></i>
+                </div>
+                <h1>sporto<span>book</span></h1>
+                <p>Your Gateway to Sports Excellence</p>
+            </div>
+            
+           <div class="auth-tabs">
+    <button class="auth-tab active" data-tab="login">Sign In</button>
+    <button class="auth-tab" data-tab="register">Sign Up</button>
+</div>
+            
+            <!-- Login Form -->
+            <div class="auth-panel active" id="login-panel">
+                <form id="login-form" class="premium-form">
+                    <div class="input-group-modern">
+                        <div class="input-icon">
+                            <i class="fas fa-envelope"></i>
+                        </div>
+                        <input type="email" id="login-email" required placeholder=" ">
+                        <label>Email Address</label>
+                        <div class="input-border"></div>
+                    </div>
+                    
+                    <div class="input-group-modern">
+                        <div class="input-icon">
+                            <i class="fas fa-lock"></i>
+                        </div>
+                        <input type="password" id="login-password" required placeholder=" ">
+                        <label>Password</label>
+                        <button type="button" class="toggle-password-modern">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <div class="input-border"></div>
+                    </div>
+                    
+                    <div class="form-options-modern">
+                        <label class="checkbox-modern">
+                            <input type="checkbox" id="remember-me">
+                            <span class="checkmark"></span>
+                            <span>Remember me</span>
+                        </label>
+                        <a href="#" id="forgot-password-link" class="forgot-link-modern">Forgot Password?</a>
+                    </div>
+                    
+                    <button type="submit" class="auth-btn-premium">
+                        <span>Sign In</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </button>
+                </form>
+                
+                <div class="auth-divider">
+                    <span>Or continue with</span>
+                </div>
+                
+                <div class="social-login">
+                    <button class="social-btn-premium google" id="google-signin-btn">
+                        <i class="fab fa-google"></i>
+                        <span>Google</span>
+                    </button>
+                </div>
+            </div>
+            <!-- Add Register Panel after Login Panel -->
+<div class="auth-panel" id="register-panel">
+    <form id="register-form" class="premium-form">
+        <div class="input-group-modern">
+            <div class="input-icon">
+                <i class="fas fa-user"></i>
+            </div>
+            <input type="text" id="reg-name" required placeholder=" ">
+            <label>Full Name</label>
+            <div class="input-border"></div>
+        </div>
+        
+        <div class="input-group-modern">
+            <div class="input-icon">
+                <i class="fas fa-envelope"></i>
+            </div>
+            <input type="email" id="reg-email" required placeholder=" ">
+            <label>Email Address</label>
+            <div class="input-border"></div>
+        </div>
+        
+        <div class="input-group-modern">
+            <div class="input-icon">
+                <i class="fas fa-phone"></i>
+            </div>
+            <input type="tel" id="reg-phone" required placeholder=" " maxlength="10">
+            <label>Phone Number</label>
+            <div class="input-border"></div>
+        </div>
+        
+        <div class="input-group-modern">
+            <div class="input-icon">
+                <i class="fas fa-lock"></i>
+            </div>
+            <input type="password" id="reg-password" required placeholder=" ">
+            <label>Password</label>
+            <button type="button" class="toggle-password-modern">
+                <i class="fas fa-eye"></i>
+            </button>
+            <div class="input-border"></div>
+        </div>
+        
+        <div class="input-group-modern">
+            <div class="input-icon">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <input type="password" id="reg-confirm-password" required placeholder=" ">
+            <label>Confirm Password</label>
+            <div class="input-border"></div>
+        </div>
+        
+        <div class="form-options-modern">
+            <label class="checkbox-modern">
+                <input type="checkbox" id="reg-agree-terms" required>
+                <span class="checkmark"></span>
+                <span>I agree to the <a href="#" id="reg-terms-link" style="color: #667eea;">Terms & Conditions</a></span>
+            </label>
+        </div>
+        
+        <button type="submit" class="auth-btn-premium">
+            <span>Create Account</span>
+            <i class="fas fa-arrow-right"></i>
+        </button>
+    </form>
+    
+    <div class="auth-divider">
+        <span>Or sign up with</span>
+    </div>
+    
+    <div class="social-login">
+        <button class="social-btn-premium google" id="google-signin-btn-register">
+            <i class="fab fa-google"></i>
+            <span>Google</span>
+        </button>
+    </div>
+</div>
+
+        
+            
+            <div class="auth-footer-links">
+                <a href="#" id="show-owner-register-link" class="owner-link">
+                    <i class="fas fa-store"></i>
+                    <span>Become a Partner - List Your Ground</span>
+                    <i class="fas fa-arrow-right"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+        <!-- OWNER TYPE SELECTION PAGE (NEW) -->
+        <!-- OWNER TYPE SELECTION PAGE (NEW) -->
+<div id="owner-type-page" class="page auth-page">
+    <div class="auth-container">
+        <div class="auth-header">
+            <button class="back-btn" id="owner-type-back-btn">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <h1>Become a Partner</h1>
+            <p>Select your business type</p>
+        </div>
+        <div class="auth-body">
+            <div class="owner-type-grid">
+                
+                
+                <div class="owner-type-card" id="select-plot-owner">
+                    <div class="owner-type-icon">
+                        <i class="fas fa-tree"></i>
+                    </div>
+                    <h3>Plot / Ground Owner</h3>
+                    <p>I have an empty plot or open ground</p>
+                    <ul class="owner-type-features">
+                        <li><i class="fas fa-check"></i> Free registration</li>
+                        <li><i class="fas fa-check"></i> Free listing - NO FEES!</li>
+                        <li><i class="fas fa-check"></i> Only 10% commission</li>
+                        <li><i class="fas fa-check"></i> List unlimited grounds</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+        <!-- VENUE OWNER REGISTRATION PAGE -->
+        <div id="venue-owner-register-page" class="page auth-page">
+            <div class="auth-container">
+                <div class="auth-header">
+                    <button class="back-btn" id="venue-owner-register-back-btn">
+                        <i class="fas fa-arrow-left"></i>
+                    </button>
+                    <h1>Venue Owner Registration</h1>
+                    <p>List your sports facility</p>
+                </div>
+                <div class="auth-body">
+                    <form id="venue-owner-register-form" class="auth-form">
+                        <div class="form-section">
+                            <h3 class="form-section-title">Personal Information</h3>
+                            
+                            <div class="input-group floating">
+                                <input type="text" id="venue-owner-name" required placeholder=" ">
+                                <label>Owner Full Name</label>
+                                <i class="fas fa-user input-icon"></i>
+                            </div>
+                            
+                            <div class="input-group floating">
+                                <input type="email" id="venue-owner-email" required placeholder=" ">
+                                <label>Email Address</label>
+                                <i class="fas fa-envelope input-icon"></i>
+                            </div>
+                            
+                            <div class="input-group floating">
+                                <input type="tel" id="venue-owner-phone" required placeholder=" ">
+                                <label>Phone Number</label>
+                                <i class="fas fa-phone input-icon"></i>
+                            </div>
+                            
+                            <div class="input-group floating">
+                                <input type="password" id="venue-owner-password" required placeholder=" ">
+                                <label>Password</label>
+                                <i class="fas fa-lock input-icon"></i>
+                                <i class="fas fa-eye toggle-password"></i>
+                            </div>
+                            
+                            <div class="input-group floating">
+                                <input type="text" id="venue-owner-upi" placeholder=" " required>
+                                <label>UPI ID (for payouts)</label>
+                                <i class="fas fa-qrcode input-icon"></i>
+                            </div>
+                        </div>
+                        
+                        <div class="form-section">
+                            <h3 class="form-section-title">Venue Information</h3>
+                            
+                            <div class="input-group floating">
+                                <input type="text" id="venue-name" required placeholder=" ">
+                                <label>Venue Name</label>
+                                <i class="fas fa-building input-icon"></i>
+                            </div>
+                            
+                            <div class="input-group floating">
+                                <select id="venue-sport" required>
+                                    <option value="" disabled selected></option>
+                                    <option value="cricket">Cricket</option>
+                                    <option value="football">Football</option>
+                                    <option value="badminton">Badminton</option>
+                                    <option value="tennis">Tennis</option>
+                                    <option value="basketball">Basketball</option>
+                                    <option value="volleyball">Volleyball</option>
+                                    <option value="swimming">Swimming</option>
+                                    <option value="multi">Multi-Sport</option>
+                                </select>
+                                <label>Primary Sport</label>
+                                <i class="fas fa-futbol input-icon"></i>
+                            </div>
+                            
+                            <div class="input-group floating">
+                                <textarea id="venue-address" rows="2" required placeholder=" "></textarea>
+                                <label>Complete Address</label>
+                                <i class="fas fa-map-marker-alt input-icon"></i>
+                            </div>
+                            
+                            <div class="input-group floating">
+                                <input type="text" id="venue-city" required placeholder=" ">
+                                <label>City</label>
+                                <i class="fas fa-city input-icon"></i>
+                            </div>
+                            
+                            <div class="input-group floating">
+                                <input type="file" id="venue-images" multiple accept="image/*">
+                                <label>Upload Photos (Min 3)</label>
+                                <i class="fas fa-images input-icon"></i>
+                            </div>
+                            
+                            <div class="input-group floating">
+                                <textarea id="venue-description" rows="3" placeholder=" "></textarea>
+                                <label>Venue Description & Facilities</label>
+                                <i class="fas fa-align-left input-icon"></i>
+                            </div>
+                        </div>
+                        
+                        <label class="checkbox-container terms">
+                            <input type="checkbox" id="venue-owner-agree-terms" required>
+                            <span class="checkmark"></span>
+                            <span class="checkbox-label">I agree to the <a href="#" id="venue-owner-terms-link">Terms & Owner Agreement</a></span>
+                        </label>
+                        
+                        <button type="submit" class="auth-btn">Register as Venue Owner</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- PLOT OWNER REGISTRATION PAGE (FREE ACCOUNT) -->
+        <!-- PLOT OWNER REGISTRATION PAGE (FREE ACCOUNT) -->
+<!-- PLOT OWNER REGISTRATION PAGE (FREE ACCOUNT) -->
+<div id="plot-owner-register-page" class="page auth-page">
+    <div class="auth-container">
+        <div class="auth-header">
+            <button class="back-btn" id="plot-owner-register-back-btn">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <h1>Plot / Ground Owner Registration</h1>
+            <p>Create your free account</p>
+        </div>
+        <div class="auth-body">
+            <div class="info-banner" style="background: linear-gradient(135deg, var(--success), #059669);">
+                <i class="fas fa-check-circle"></i>
+                <strong>Completely FREE!</strong> Create your account and list your grounds at no cost.
+            </div>
+            
+            <form id="plot-owner-register-form" class="auth-form">
+                <div class="form-section">
+                    <h3 class="form-section-title">Personal Information</h3>
+                    
+                    <div class="input-group floating">
+                        <input type="text" id="plot-owner-name" required placeholder=" ">
+                        <label>Full Name</label>
+                        <i class="fas fa-user input-icon"></i>
+                    </div>
+                    
+                    <div class="input-group floating">
+                        <input type="email" id="plot-owner-email" required placeholder=" ">
+                        <label>Email Address</label>
+                        <i class="fas fa-envelope input-icon"></i>
+                    </div>
+                    
+                    <div class="input-group floating">
+                        <input type="tel" id="plot-owner-phone" required placeholder=" ">
+                        <label>Phone Number</label>
+                        <i class="fas fa-phone input-icon"></i>
+                    </div>
+                    
+                    <div class="input-group floating">
+                        <input type="password" id="plot-owner-password" required placeholder=" ">
+                        <label>Password</label>
+                        <i class="fas fa-lock input-icon"></i>
+                        <i class="fas fa-eye toggle-password"></i>
+                    </div>
+                    
+                    <div class="input-group floating">
+                        <input type="text" id="plot-owner-upi" placeholder=" " required>
+                        <label>UPI ID (for payouts)</label>
+                        <i class="fas fa-qrcode input-icon"></i>
+                    </div>
+                </div>
+                
+                <div class="terms-section">
+                    <h4>How it works:</h4>
+                    <ul>
+                        <li><i class="fas fa-check"></i> <strong>Step 1:</strong> Create your FREE account now</li>
+                        <li><i class="fas fa-check"></i> <strong>Step 2:</strong> List your ground - COMPLETELY FREE!</li>
+                        <li><i class="fas fa-check"></i> <strong>Step 3:</strong> Start earning - you get 90% of every booking</li>
+                        <li><i class="fas fa-check"></i> <strong>No hidden fees:</strong> Only 10% commission on bookings</li>
+                    </ul>
+                </div>
+                
+                <label class="checkbox-container terms">
+                    <input type="checkbox" id="plot-owner-agree-terms" required>
+                    <span class="checkmark"></span>
+                    <span class="checkbox-label">I agree to the <a href="#" id="plot-owner-terms-link">Terms & Owner Agreement</a></span>
+                </label>
+                
+                <button type="submit" class="auth-btn">Create Free Account</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+        <!-- MAIN HOME PAGE -->
+        <div id="main-page" class="page">
+            <header class="main-header">
+    <div class="header-content">
+        <h1 class="logo">Spörto<span>Book</span></h1>
+        <div class="header-actions">
+            <!-- Payment Verification Icon - RIGHT NEXT TO PROFILE -->
+            <button class="payment-verify-icon" id="payment-verify-icon">
+                <div class="payment-icon-wrapper">
+                    <i class="fas fa-credit-card"></i>
+                    <div class="payment-animation">
+                        <span class="sport-ball"></span>
+                        <span class="sport-ball2"></span>
+                        <span class="sport-ball3"></span>
+                    </div>
+                </div>
+                <span class="payment-badge" id="payment-verify-badge" style="display: none;">!</span>
+            </button>
+            
+            <!-- QR Scanner for Owners (only shows for owners) -->
+            <button class="qr-scanner-btn" id="header-qr-scanner" style="display: none;">
+                <i class="fas fa-qrcode"></i>
+            </button>
+            
+            <!-- Profile Button -->
+            <button class="profile-btn bmg-profile-btn" id="profile-btn" style="cursor:pointer;background:none;border:none;padding:0;">
+                <div class="bmg-profile-avatar" id="bmg-profile-avatar">
+                    <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2'%3E%3Ccircle cx='12' cy='8' r='4'/%3E%3Cpath d='M5 20v-2a7 7 0 0 1 14 0v2'/%3E%3C/svg%3E" id="header-profile-img" alt="Profile" style="pointer-events:none;display:block;width:100%;height:100%;object-fit:cover;border-radius:50%;">
+                </div>
+            </button>
+        </div>
+    </div>
+    
+    <!-- Upcoming Booking Banner (only visible when booking exists) -->
+    <div class="spb-upcoming-banner empty" id="spb-upcoming-banner" style="display:none;">
+        <div class="upcoming-icon">🏟️</div>
+        <div class="upcoming-info">
+            <div class="upcoming-label">Upcoming Booking</div>
+            <div class="upcoming-name" id="spb-upcoming-name">Ground Booking</div>
+            <div class="upcoming-addr" id="spb-upcoming-addr"></div>
+        </div>
+        <div class="upcoming-time-chip" id="spb-upcoming-time">Soon</div>
+    </div>
+    <!-- Search Container -->
+    <div class="search-container">
+        <div class="search-bar">
+            <i class="fas fa-search search-bar__icon"></i>
+            <input type="text" placeholder="Search venues, sports, locations..." id="global-search" autocomplete="off">
+            <button id="search-clear-btn" class="search-bar__clear" style="display:none;" onclick="document.getElementById('global-search').value='';window.searchVenues&&window.searchVenues('');document.getElementById('search-result-count').style.display='none';this.style.display='none';">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div id="search-result-count" class="search-result-count" style="display:none;"></div>
+    </div>
+    
+    <!-- Location Bar — hidden: city-selector used instead -->
+    <div class="location-bar" style="display:none !important;">
+        <i class="fas fa-map-marker-alt"></i>
+        
+        <button class="refresh-location" id="refresh-location">
+            <i class="fas fa-sync-alt"></i>
+        </button>
+    </div>
+</header>
+<!-- PROFESSIONAL QR SCANNER MODAL -->
+<div id="professional-qr-modal" class="modal" style="display: none;">
+    <div class="qr-scanner-container">
+        <div class="qr-scanner-header">
+            <div class="scanner-header-content">
+                <div class="scanner-icon">
+                    <i class="fas fa-qrcode"></i>
+                </div>
+                <div>
+                    <h3>Scan QR Code</h3>
+                    <p>Position the QR code within the frame</p>
+                </div>
+            </div>
+            <button class="close-scanner-btn" id="close-professional-qr">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <div class="scanner-viewport">
+            <div id="professional-qr-reader" style="width: 100%; min-height: 400px;"></div>
+            <div class="scanner-overlay">
+                <div class="scan-frame">
+                    <div class="scan-corner top-left"></div>
+                    <div class="scan-corner top-right"></div>
+                    <div class="scan-corner bottom-left"></div>
+                    <div class="scan-corner bottom-right"></div>
+                    <div class="scan-line"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="scanner-controls">
+            <button class="scanner-btn torch-btn" id="toggle-torch">
+                <i class="fas fa-lightbulb"></i> Torch
+            </button>
+            <button class="scanner-btn gallery-btn" id="select-from-gallery">
+                <i class="fas fa-images"></i> Gallery
+            </button>
+            <button class="scanner-btn close-btn" id="close-scanner-btn">
+                <i class="fas fa-times"></i> Close
+            </button>
+        </div>
+        
+        <div id="professional-qr-result" class="scanner-result"></div>
+    </div>
+</div>
+<!-- BOOKING VERIFICATION RESULT MODAL -->
+<div id="verification-result-modal" class="modal">
+    <div class="modal-content bmg-verify-modal-content">
+        <!-- Animated top strip -->
+        <div class="bmg-verify-header" id="verification-result-header">
+            <div class="bmg-verify-pulse-ring" id="bmg-verify-pulse"></div>
+            <div class="bmg-verify-icon-wrap" id="result-icon">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="bmg-verify-status-text">
+                <h3 id="result-title">Verification Successful</h3>
+                <p id="bmg-verify-subtitle">Entry Authorized</p>
+            </div>
+            <button class="bmg-verify-close" id="close-verification-modal">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <!-- Body -->
+        <div class="bmg-verify-body" id="verification-result-body">
+            <!-- Dynamic content inserted here -->
+        </div>
+        <!-- Footer actions -->
+        <div class="bmg-verify-footer">
+            <button class="bmg-verify-scan-btn" id="verify-another-btn">
+                <i class="fas fa-qrcode"></i> Scan Another
+            </button>
+            <button class="bmg-verify-done-btn" id="close-result-btn">
+                <i class="fas fa-check"></i> Done
+            </button>
+        </div>
+    </div>
+</div>
+            <main class="main-content">
+
+                <!-- Sports Banner -->
+                <div class="spb-sports-banner">
+                    <div class="banner-text">
+                        <h3>Book Your<br>Ground Now</h3>
+                        <p>Find & book sports grounds near you</p>
+                    </div>
+                    <div class="banner-emojis">⚽🏏🎾</div>
+                </div>
+
+                <!-- DEALS SECTION: Book Grounds Under ₹499 (above popular sports) -->
+                <section class="section bmg-deals-section">
+                    <div class="bmg-deals-header-bar">
+                        <span class="bmg-deals-main-title">BOOK GROUNDS UNDER ₹499</span>
+                        <span class="bmg-deals-sub">Limited slots · Book now!</span>
+                    </div>
+                    <div class="bmg-deals-scroll-wrapper">
+                        <div class="bmg-deals-scroll-row" id="bmg-deals-scroll-row">
+                            <!-- Tier card 99 -->
+                            <div class="bmg-deals-tier-card">
+                                <div class="bmg-tier-label">GROUNDS AT</div>
+                                <div class="bmg-tier-price">₹ 99</div>
+                            </div>
+                            <div id="bmg-deals-row-99" class="bmg-deals-inline-cards">
+                                <div class="bmg-deal-card-skeleton"></div>
+                                <div class="bmg-deal-card-skeleton"></div>
+                            </div>
+                            <!-- Tier card 299 -->
+                            <div class="bmg-deals-tier-card" style="margin-left:6px">
+                                <div class="bmg-tier-label">GROUNDS AT</div>
+                                <div class="bmg-tier-price">₹ 299</div>
+                            </div>
+                            <div id="bmg-deals-row-299" class="bmg-deals-inline-cards">
+                                <div class="bmg-deal-card-skeleton"></div>
+                                <div class="bmg-deal-card-skeleton"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Popular Sports -->
+                <section class="section">
+                    <h2 class="section-title">Popular Sports</h2>
+                    <div class="categories-grid" id="categories-grid" style="display:none!important"></div>
+                    <div class="spb-sports-grid" id="spb-sports-grid">
+                        <div class="spb-sport-card" onclick="window.filterBySport&&window.filterBySport('Cricket')">
+                            <span class="sport-emoji">🏏</span>
+                            <span class="sport-name">Cricket</span>
+                        </div>
+                        <div class="spb-sport-card" onclick="window.filterBySport&&window.filterBySport('Football')">
+                            <span class="sport-emoji">⚽</span>
+                            <span class="sport-name">Football</span>
+                        </div>
+                        <div class="spb-sport-card" onclick="window.filterBySport&&window.filterBySport('Badminton')">
+                            <span class="sport-emoji">🏸</span>
+                            <span class="sport-name">Badminton</span>
+                        </div>
+                        <div class="spb-sport-card" onclick="window.filterBySport&&window.filterBySport('Tennis')">
+                            <span class="sport-emoji">🎾</span>
+                            <span class="sport-name">Tennis</span>
+                        </div>
+                        <div class="spb-sport-card" onclick="window.filterBySport&&window.filterBySport('Basketball')">
+                            <span class="sport-emoji">🏀</span>
+                            <span class="sport-name">Basketball</span>
+                        </div>
+                        <div class="spb-sport-card" onclick="window.filterBySport&&window.filterBySport('Volleyball')">
+                            <span class="sport-emoji">🏐</span>
+                            <span class="sport-name">Volleyball</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ═══ FEATURED GROUNDS SECTION ═══ -->
+                <section class="section" id="bmg-featured-section" style="display:none;">
+                    <div class="bmg-featured-header">
+                        <div class="bmg-featured-title-wrap">
+                            <span class="bmg-featured-crown">👑</span>
+                            <div>
+                                <h2 class="bmg-featured-title">Featured Grounds</h2>
+                                <p class="bmg-featured-sub">Premium verified · Top-rated · Handpicked</p>
+                            </div>
+                        </div>
+                        <span class="bmg-featured-live-pill">🔥 LIVE</span>
+                    </div>
+                    <div class="bmg-featured-scroll" id="bmg-featured-scroll">
+                        <!-- Populated by JS -->
+                    </div>
+                </section>
+
+                <!-- All Grounds — 3-Column Grid (like product grid) -->
+                <section class="section">
+                    <div class="section-header">
+                        <h2 class="section-title">All Grounds</h2>
+                        <a href="#" class="view-all" id="view-all-venues">View All</a>
+                    </div>
+                    <div class="bmg-grounds-grid" id="bmg-grounds-grid">
+                        <div class="bmg-grid-skeleton"></div>
+                        <div class="bmg-grid-skeleton"></div>
+                        <div class="bmg-grid-skeleton"></div>
+                        <div class="bmg-grid-skeleton"></div>
+                        <div class="bmg-grid-skeleton"></div>
+                        <div class="bmg-grid-skeleton"></div>
+                    </div>
+                    <!-- Legacy list used by filterBySport – hidden -->
+                    <div class="venues-list" id="nearby-venues" style="display:none"></div>
+                </section>
+
+                <!-- ══════════════════════════════════════════════════
+                     SWIMMING POOLS SECTION
+                ══════════════════════════════════════════════════ -->
+                <section class="section bmg-pool-section" id="bmg-pool-section">
+                    <!-- Decorative wave header -->
+                    <div class="bmg-pool-section-header">
+                        <div class="bmg-pool-wave-bg">
+                            <svg viewBox="0 0 1440 80" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+                                <path d="M0,40 C360,80 1080,0 1440,40 L1440,80 L0,80 Z" fill="rgba(14,165,233,0.12)"/>
+                                <path d="M0,55 C480,15 960,75 1440,35 L1440,80 L0,80 Z" fill="rgba(14,165,233,0.08)"/>
+                            </svg>
+                        </div>
+                        <div class="bmg-pool-header-content">
+                            <div class="bmg-pool-icon-wrap">🏊</div>
+                            <div>
+                                <h2 class="bmg-pool-title">Swimming Pools</h2>
+                                <p class="bmg-pool-subtitle">Book sessions · Group & solo · Real-time availability</p>
+                            </div>
+                            <span class="bmg-pool-live-badge">
+                                <span class="bmg-pool-live-dot"></span>LIVE
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Pool cards scroll row -->
+                    <div class="bmg-pool-scroll-row" id="bmg-pool-scroll-row">
+                        <!-- Skeleton loaders -->
+                        <div class="bmg-pool-card-skeleton"></div>
+                        <div class="bmg-pool-card-skeleton"></div>
+                        <div class="bmg-pool-card-skeleton"></div>
+                    </div>
+
+                    <!-- Empty state (shown if no pools) -->
+                    <div class="bmg-pool-empty" id="bmg-pool-empty" style="display:none;">
+                        <span>🏊</span>
+                        <p>No swimming pools listed yet</p>
+                        <small>Own a pool? List it free!</small>
+                    </div>
+                </section>
+
+            </main>
+
+            <!-- Bottom Navigation -->
+            <nav class="bottom-nav">
+                <a href="#" class="nav-item active" id="nav-home">
+                    <i class="fas fa-home"></i>
+                    <span>Home</span>
+                </a>
+                <a href="#" class="nav-item" id="nav-bookings">
+                    <i class="fas fa-calendar-check"></i>
+                    <span>Bookings</span>
+                </a>
+                <a href="#" class="nav-item" id="nav-profile">
+                    <i class="fas fa-user"></i>
+                    <span>Profile</span>
+                </a>
+            </nav>
+        </div>
+
+        <!-- ════════════════════════════════════════════════════════
+             SWIMMING POOL DETAIL PAGE
+        ════════════════════════════════════════════════════════ -->
+        <div id="pool-page" class="page">
+            <header class="details-header bmg-pool-page-header">
+                <button class="back-btn" id="pool-back-btn">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <h2>Pool Details</h2>
+                <div style="width:40px;"></div>
+            </header>
+
+            <!-- Pool Gallery -->
+            <div class="bmg-pool-gallery-container">
+                <div class="bmg-pool-gallery" id="pool-gallery">
+                    <div class="bmg-pool-gallery-loader">
+                        <div class="bmg-pool-ripple"></div>
+                    </div>
+                </div>
+                <div class="bmg-pool-gallery-overlay"></div>
+                <div class="bmg-pool-gallery-badge" id="pool-type-badge">🏊 Pool</div>
+            </div>
+
+            <div class="bmg-pool-page-content">
+
+                <!-- Info Card -->
+                <div class="bmg-pool-info-card">
+                    <h2 id="pool-name">Loading…</h2>
+                    <div class="bmg-pool-meta-row">
+                        <span class="bmg-pool-price-tag" id="pool-base-price">₹—</span>
+                        <span class="bmg-pool-per-label">/member/slot</span>
+                        <span class="bmg-pool-capacity-badge" id="pool-capacity-badge">— members max</span>
+                    </div>
+
+                    <div class="bmg-pool-amenities-row" id="pool-amenities-row">
+                        <!-- Populated by JS -->
+                    </div>
+
+                    <div class="bmg-pool-addr-row" id="pool-address">
+                        <i class="fas fa-map-marker-alt" style="color:#0ea5e9"></i>
+                        <span>Loading address…</span>
+                    </div>
+                    <div class="bmg-pool-owner-row" id="pool-owner-info">
+                        <i class="fas fa-user-circle" style="color:#0ea5e9"></i>
+                        <span>Loading owner…</span>
+                    </div>
+                </div>
+
+                <!-- Dynamic price notice -->
+                <div class="bmg-pool-pricing-notice">
+                    <i class="fas fa-info-circle"></i>
+                    <span>Price increases as more members book the same slot — book early!</span>
+                </div>
+
+                <!-- Date Selector -->
+                <div class="bmg-pool-date-section">
+                    <h3>Select Date</h3>
+                    <div class="bmg-pool-date-row" id="pool-date-selector"></div>
+                </div>
+
+                <!-- Pool Slots Section -->
+                <div class="bmg-pool-slots-section">
+                    <div class="bmg-pool-slots-header">
+                        <h3>Available Sessions</h3>
+                        <span class="bmg-pool-live-indicator">
+                            <span class="bmg-pool-live-dot"></span>Live
+                        </span>
+                    </div>
+
+                    <!-- Legend -->
+                    <div class="bmg-pool-legend">
+                        <div class="bmg-pool-legend-item"><span class="bmg-pool-legend-dot" style="background:#22c55e"></span>Open</div>
+                        <div class="bmg-pool-legend-item"><span class="bmg-pool-legend-dot" style="background:#ef4444"></span>Full</div>
+                        <div class="bmg-pool-legend-item"><span class="bmg-pool-legend-dot" style="background:#f59e0b"></span>Filling</div>
+                        <div class="bmg-pool-legend-item"><span class="bmg-pool-legend-dot" style="background:#94a3b8"></span>Passed</div>
+                    </div>
+
+                    <div class="bmg-pool-slots-grid" id="pool-slots-grid">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <!-- Reviews -->
+                <div class="bmg-pool-reviews-section">
+                    <h3>Reviews</h3>
+                    <div id="pool-reviews-list"></div>
+                    <button class="bmg-pool-review-btn" id="pool-write-review-btn">
+                        <i class="fas fa-star"></i> Write a Review
+                    </button>
+                </div>
+
+            </div><!-- end pool-page-content -->
+
+            <!-- Sticky Book Bar -->
+            <div class="bmg-pool-sticky-bar" id="pool-sticky-bar" style="display:none;">
+                <div class="bmg-pool-sticky-info">
+                    <div>
+                        <div class="bmg-pool-sticky-label">Selected Slot</div>
+                        <div class="bmg-pool-sticky-time" id="pool-sticky-time">—</div>
+                    </div>
+                    <div style="text-align:right">
+                        <div class="bmg-pool-sticky-label">You Pay</div>
+                        <div class="bmg-pool-sticky-amount" id="pool-sticky-amount">—</div>
+                    </div>
+                </div>
+                <button class="bmg-pool-book-btn" id="pool-book-now-btn">
+                    <i class="fas fa-swimming-pool"></i> Book Now
+                </button>
+            </div>
+        </div>
+        <!-- END pool-page -->
+
+        <!-- VENUE DETAILS PAGE -->
+        <div id="venue-page" class="page">
+            <header class="details-header">
+                <button class="back-btn" id="venue-back-btn">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <h2>Venue Details</h2>
+                <button class="share-btn" id="share-venue-btn">
+                    <i class="fas fa-share-alt"></i>
+                </button>
+            </header>
+            
+            <div class="venue-gallery-container">
+                <div class="venue-gallery" id="venue-gallery"></div>
+                <div class="gallery-dots" id="gallery-dots"></div>
+            </div>
+            
+            <div class="venue-content">
+                <div class="venue-info-header">
+                    <div>
+                        <h1 id="venue-name">Loading...</h1>
+                        <div class="venue-rating">
+                            <i class="fas fa-star"></i>
+                            <span id="venue-rating">0.0</span>
+                            <span class="reviews-count" id="reviews-count">(0 reviews)</span>
+                            <span class="verified-badge" id="venue-verified-badge" style="display: none;">
+                                <i class="fas fa-check-circle"></i> Verified
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="venue-location">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <span id="venue-address">Loading...</span>
+                    <a href="#" id="open-maps" class="open-maps-link" target="_blank">
+                        <i class="fas fa-directions"></i>
+                    </a>
+                </div>
+                
+                <div class="venue-description" id="venue-description"></div>
+                
+                <!-- Grounds Section -->
+                <div class="grounds-section">
+                    <h3>Available Grounds</h3>
+                    <div id="grounds-list"></div>
+                </div>
+
+                <!-- Report Issue Button (NEW) -->
+                <button class="report-issue-btn" id="report-venue-issue">
+                    <i class="fas fa-flag"></i> Report Issue
+                </button>
+            </div>
+        </div>
+
+        <!-- GROUND DETAILS PAGE -->
+<div id="ground-page" class="page">
+    <header class="details-header">
+        <button class="back-btn" id="ground-back-btn">
+            <i class="fas fa-arrow-left"></i>
+        </button>
+        <h2>Ground Details</h2>
+        <div style="width:40px;"></div>
+    </header>
+    
+    <!-- Image Gallery Section - MOVED TO TOP -->
+    <div class="ground-gallery-container">
+        <div class="ground-gallery" id="ground-gallery">
+            <div class="gallery-loading">
+                <div class="loader-spinner"></div>
+            </div>
+        </div>
+        <div class="gallery-nav">
+            <button class="gallery-nav-btn prev" id="gallery-prev">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <div class="gallery-dots" id="gallery-dots"></div>
+            <button class="gallery-nav-btn next" id="gallery-next">
+                <i class="fas fa-chevron-right"></i>
+            </button>
+        </div>
+    </div>
+    
+    <div class="ground-content">
+        <div class="ground-info-card">
+            <h2 id="ground-name">Loading...</h2>
+            <div class="ground-price" id="ground-price">₹0/hour</div>
+            <div class="ground-sport" id="ground-sport"></div>
+            
+            <div class="ground-type-badge" id="plot-owner-badge" style="display: none;">
+                <i class="fas fa-tree"></i> Open Ground
+            </div>
+            
+            <div class="ground-address" id="ground-address">
+                <i class="fas fa-map-pin"></i>
+                <span>Loading address...</span>
+            </div>
+            
+            <div class="ground-owner-contact" id="ground-owner-contact">
+                <i class="fas fa-user"></i>
+                <span>Loading owner details...</span>
+            </div>
+
+            <div class="ground-owner-verified" id="owner-verified-badge" style="display: none;">
+                <i class="fas fa-check-circle"></i> Verified Owner
+            </div>
+        </div>
+        
+        <!-- Date Selector -->
+        <div class="date-selector-section">
+            <h3>Select Date</h3>
+            <div class="date-selector" id="date-selector"></div>
+        </div>
+        
+        <!-- Time Slots -->
+        <div class="slots-section">
+            <h3>Available Time Slots</h3>
+            <div class="slots-grid" id="time-slots"></div>
+        </div>
+        
+        <!-- Reviews -->
+        <div class="reviews-section">
+            <h3>Reviews & Ratings</h3>
+            <div class="reviews-list" id="ground-reviews"></div>
+            <button class="write-review-btn" id="write-review-btn">Write a Review</button>
+        </div>
+
+        <!-- Sticky Book Now Button -->
+        <div class="sticky-book-btn" id="sticky-book-btn" style="display: none;">
+            <button class="book-now-btn" id="sticky-book-now">Book Now</button>
+        </div>
+    </div>
+</div>
+
+        <!-- BOOKING PAGE -->
+<!-- BOOKING PAGE -->
+<div id="booking-page" class="page">
+    <header class="details-header">
+        <button class="back-btn" id="booking-back-btn">
+            <i class="fas fa-arrow-left"></i>
+        </button>
+        <h2>Complete Booking</h2>
+        <div style="width:40px;"></div>
+    </header>
+    
+    <div class="booking-content">
+        <div class="booking-summary-card">
+            <h3>Booking Summary</h3>
+            <div class="summary-item">
+                <span>Ground:</span>
+                <span id="booking-ground-name"></span>
+            </div>
+            <div class="summary-item">
+                <span>Date:</span>
+                <span id="booking-date"></span>
+            </div>
+            <div class="summary-item">
+                <span>Time:</span>
+                <span id="booking-time"></span>
+            </div>
+            <hr>
+            <div class="summary-item total">
+                <span>Total Amount:</span>
+                <span id="booking-amount">₹0</span>
+            </div>
+            <div class="summary-item">
+                <span>Platform Fee (10%):</span>
+                <span id="platform-fee">₹0</span>
+            </div>
+            <div class="summary-item">
+                <span>You Pay:</span>
+                <span id="final-amount">₹0</span>
+            </div>
+        </div>
+        
+        <div class="payment-section">
+            <h3>Payment</h3>
+            <p class="payment-info">Complete payment to confirm your booking</p>
+            
+            <div class="payment-details">
+                <div class="payment-amount-box">
+                    <span class="payment-label">Amount to Pay:</span>
+                    <span class="payment-amount" id="payment-amount">₹0</span>
+                </div>
+            </div>
+            
+            <!-- CASHFREE PAYMENT BUTTON — handled by paymentService.js startPayment() -->
+            <div class="cashfree-button-wrapper" id="cashfree-button-wrapper">
+<button id="cashfree-pay-btn" type="button" class="bmg-pay-btn">
+  <img src="https://cashfreelogo.cashfree.com/cashfreepayments/logosvgs/Group_4355.svg"
+       alt="" style="height:24px;vertical-align:middle;margin-right:10px;">
+  Pay &amp; Confirm Booking
+</button>
+                <p class="payment-note" style="margin-top: 15px;">
+                    <i class="fas fa-shield-alt"></i>
+                    Secured by Cashfree | PCI DSS Compliant
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+        <!-- BOOKING CONFIRMATION PAGE -->
+        <div id="confirmation-page" class="page">
+            <header class="details-header">
+                <button class="back-btn" id="confirmation-home-btn">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <h2>Booking Status</h2>
+                <div style="width:40px;"></div>
+            </header>
+            
+            <div class="confirmation-content">
+                <div class="status-icon success" id="confirmation-status-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <h2 id="confirmation-title">Payment Successful!</h2>
+                <p id="confirmation-message">Your booking has been confirmed. Show the entry pass at the venue.</p>
+                
+                <div class="booking-details-card" id="confirmation-details"></div>
+                
+                <button class="view-pass-btn" id="view-entry-pass-btn">View Entry Pass</button>
+                <button class="home-btn" id="back-to-home-btn">Back to Home</button>
+                
+                <!-- Referral Share (NEW) -->
+                <div class="referral-share" id="referral-share" style="display: none;">
+                    <p>Share and earn rewards!</p>
+                    <div class="share-buttons">
+                        <button class="share-btn-whatsapp" id="share-whatsapp"><i class="fab fa-whatsapp"></i></button>
+                        <button class="share-btn-facebook" id="share-facebook"><i class="fab fa-facebook"></i></button>
+                        <button class="share-btn-twitter" id="share-twitter"><i class="fab fa-twitter"></i></button>
+                        <button class="share-btn-copy" id="copy-link"><i class="fas fa-link"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+<!-- Host Fee Payment Verification Modal -->
+<div id="host-payment-verify-modal" class="modal">
+    <div class="modal-content" style="max-width: 400px;">
+        <div class="modal-header">
+            <h3><i class="fas fa-clock"></i> Payment Verification</h3>
+            <button class="close-btn" id="close-host-payment-verify-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="verification-content" style="text-align: center;">
+                <div class="loading-spinner" style="margin: var(--space-lg) auto;">
+                    <div class="loader-spinner"></div>
+                </div>
+                <p id="verification-status-text">Verifying your payment...</p>
+                <p class="verification-note" style="font-size: var(--font-xs); color: var(--gray-500); margin-top: var(--space-md);">
+                    Please wait while we confirm your payment.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Host Payment Success Modal -->
+<div id="host-payment-success-modal" class="modal">
+    <div class="modal-content" style="max-width: 400px;">
+        <div class="modal-header" style="background: linear-gradient(135deg, var(--success), #059669); color: white;">
+            <h3><i class="fas fa-check-circle"></i> Payment Successful!</h3>
+            <button class="close-btn" id="close-host-payment-success-modal" style="color: white;">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div style="text-align: center;">
+                <div style="width: 80px; height: 80px; background: linear-gradient(135deg, var(--success), #059669); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto var(--space-xl);">
+                    <i class="fas fa-check" style="font-size: 2.5rem; color: white;"></i>
+                </div>
+                <h4>Payment Confirmed!</h4>
+                <p id="payment-success-message">Your match has been created successfully.</p>
+                <div style="margin-top: var(--space-xl);">
+                    <button class="auth-btn" id="view-created-match-btn">View My Match</button>
+                    <button class="home-btn" id="host-payment-close-btn" style="margin-top: var(--space-sm);">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Host Payment Failed Modal -->
+<div id="host-payment-failed-modal" class="modal">
+    <div class="modal-content" style="max-width: 400px;">
+        <div class="modal-header" style="background: linear-gradient(135deg, var(--danger), #dc2626); color: white;">
+            <h3><i class="fas fa-times-circle"></i> Payment Failed</h3>
+            <button class="close-btn" id="close-host-payment-failed-modal" style="color: white;">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div style="text-align: center;">
+                <div style="width: 80px; height: 80px; background: linear-gradient(135deg, var(--danger), #dc2626); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto var(--space-xl);">
+                    <i class="fas fa-times" style="font-size: 2.5rem; color: white;"></i>
+                </div>
+                <h4>Payment Failed</h4>
+                <p id="payment-failed-message">We couldn't verify your payment. Please try again.</p>
+                <div style="margin-top: var(--space-xl);">
+                    <button class="auth-btn" id="retry-payment-btn">Try Again</button>
+                    <button class="home-btn" id="host-payment-failed-close-btn" style="margin-top: var(--space-sm);">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+        <!-- ENTRY PASS PAGE -->
+        <div id="entry-pass-page" class="page">
+            <header class="details-header">
+                <button class="back-btn" id="entry-pass-back-btn">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <h2>Entry Pass</h2>
+                <div style="width:40px;"></div>
+            </header>
+            
+            <div class="entry-pass-content" id="entry-pass-content"></div>
+        </div>
+
+        <!-- MY BOOKINGS PAGE -->
+        <div id="bookings-page" class="page">
+            <header class="page-header">
+                <button class="back-btn" id="bookings-back-btn">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <h2>My Bookings</h2>
+                <div style="width:40px;"></div>
+            </header>
+            
+            <div class="bookings-tabs">
+                <button class="tab-btn active" id="bookings-upcoming">Upcoming</button>
+                <button class="tab-btn" id="bookings-past">Past</button>
+            </div>
+
+            <div class="bookings-list" id="user-bookings-list">
+                <div class="loading-spinner">
+                    <div class="loader-spinner"></div>
+                </div>
+            </div>
+
+            <!-- SWIMMING POOL PASSES SECTION -->
+            <div class="pool-passes-section" id="pool-passes-section" style="display:none;">
+                <div class="pool-section-header">
+                    <h3>🏊 Swimming Pool Passes</h3>
+                </div>
+                
+                <div class="pool-passes-tabs">
+                    <button class="pool-tab-btn active" id="pool-upcoming-btn">Upcoming</button>
+                    <button class="pool-tab-btn" id="pool-past-btn">Past</button>
+                </div>
+
+                <div class="pool-passes-list" id="pool-passes-list">
+                    <div class="loading-spinner">
+                        <div class="loader-spinner"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PROFILE PAGE -->
+        <div id="profile-page" class="page">
+            <header class="details-header">
+                <button class="back-btn" id="profile-back-btn">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <h2>Profile</h2>
+                <button class="edit-btn" id="edit-profile-btn">
+                    <i class="fas fa-edit"></i>
+                </button>
+            </header>
+            <!-- Owner Verification Status Section -->
+<div id="owner-verification-status" class="owner-verification-status" style="display: none; margin-top: 24px;">
+    <div class="verification-card">
+        <div class="verification-header">
+            <i class="fas fa-shield-alt"></i>
+            <h4>Owner Registration Status</h4>
+        </div>
+        <div class="verification-status-details" id="verification-status-details">
+            <div class="status-row">
+                <span class="status-label">Payment Status:</span>
+                <span class="status-value" id="owner-payment-status">Not Paid</span>
+            </div>
+            <div class="status-row">
+                <span class="status-label">Registration Fee:</span>
+                <span class="status-value">₹499 (One-time)</span>
+            </div>
+            <div class="status-row">
+                <span class="status-label">Grounds Listing:</span>
+                <span class="status-value" id="grounds-listing-status">Locked</span>
+            </div>
+        </div>
+        <button id="complete-registration-btn" class="complete-reg-btn" style="display: none;"
+                onclick="showOwnerRegistrationPayment()">
+            <i class="fas fa-credit-card"></i> Complete Registration (₹499)
+        </button>
+    </div>
+</div>
+            <div class="profile-content">
+                <div class="profile-header">
+                    <div class="profile-image-large">
+    <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='1.5'%3E%3Ccircle cx='12' cy='8' r='4'/%3E%3Cpath d='M5 20v-2a7 7 0 0 1 14 0v2'/%3E%3C/svg%3E" alt="Profile" id="profile-image-large">
+    <button class="change-photo" id="change-photo-btn" style="display:none!important;" aria-hidden="true">
+        <i class="fas fa-camera"></i>
+    </button>
+</div>
+                    <h3 id="profile-name">Loading...</h3>
+                    <p id="profile-email">Loading...</p>
+                    <p id="profile-phone">Loading...</p>
+                    <div id="profile-role-badge" class="role-badge"></div>
+                </div>
+                <!-- Profile Stats Row -->
+                <div class="profile-stats-row" id="profile-stats-row" style="display:none;">
+                    <div class="profile-stat-item">
+                        <div class="profile-stat-num" id="profile-stat-bookings">0</div>
+                        <div class="profile-stat-label">Bookings</div>
+                    </div>
+                    <div class="profile-stat-item">
+                        <div class="profile-stat-num" id="profile-stat-grounds">0</div>
+                        <div class="profile-stat-label">Grounds</div>
+                    </div>
+                    <div class="profile-stat-item">
+                        <div class="profile-stat-num" id="profile-stat-matches">0</div>
+                        <div class="profile-stat-label">Matches</div>
+                    </div>
+                </div>
+                
+
+                <div class="profile-menu">
+    <a href="#" class="menu-item" id="profile-bookings-link">
+        <i class="fas fa-calendar-check"></i>
+        <span>My Bookings</span>
+        <i class="fas fa-chevron-right"></i>
+    </a>
+    
+    <a href="#" class="menu-item" id="owner-dashboard-link" style="display: none;">
+        <i class="fas fa-tachometer-alt"></i>
+        <span>Owner Dashboard</span>
+        <i class="fas fa-chevron-right"></i>
+    </a>
+    
+    <a href="#" class="menu-item" id="admin-dashboard-link" style="display: none;">
+        <i class="fas fa-user-shield"></i>
+        <span>Admin Dashboard</span>
+        <i class="fas fa-chevron-right"></i>
+    </a>
+    
+    <a href="#" class="menu-item" id="ceo-dashboard-link" style="display: none;">
+        <i class="fas fa-crown"></i>
+        <span>CEO Dashboard</span>
+        <i class="fas fa-chevron-right"></i>
+    </a>
+    
+    <a href="#" class="menu-item" id="terms-menu-link">
+        <i class="fas fa-file-contract"></i>
+        <span>Terms & Conditions</span>
+        <i class="fas fa-chevron-right"></i>
+    </a>
+    
+    <a href="#" class="menu-item" id="privacy-menu-link">
+        <i class="fas fa-shield-alt"></i>
+        <span>Privacy Policy</span>
+        <i class="fas fa-chevron-right"></i>
+    </a>
+    
+    <a href="#" class="menu-item" id="owner-agreement-menu-link">
+        <i class="fas fa-handshake"></i>
+        <span>Owner Agreement</span>
+        <i class="fas fa-chevron-right"></i>
+    </a>
+    
+    <a href="#" class="menu-item logout" id="logout-btn">
+        <i class="fas fa-sign-out-alt"></i>
+        <span>Logout</span>
+    </a>
+</div>
+            </div>
+        </div>
+
+<!-- MY MATCHES PAGE -->
+<div id="my-matches-page" class="page">
+    <header class="details-header">
+        <button class="back-btn" id="my-matches-back-btn">
+            <i class="fas fa-arrow-left"></i>
+        </button>
+        <h2>My Matches</h2>
+        <div style="width:40px;"></div>
+    </header>
+    
+    <div class="my-matches-content">
+        <div class="matches-tabs">
+            <button class="tab-btn active" id="matches-upcoming">Upcoming</button>
+            <button class="tab-btn" id="matches-past">Past</button>
+            <button class="tab-btn" id="matches-hosted">Hosted by Me</button>
+        </div>
+        
+        <div class="my-matches-list" id="my-matches-list">
+            <div class="loading-spinner">
+                <div class="loader-spinner"></div>
+                <p>Loading your matches...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Fullscreen Image Viewer Modal -->
+<div id="image-viewer-modal" class="image-viewer-modal">
+    <div class="image-viewer-container">
+        <button class="image-viewer-close" id="image-viewer-close">
+            <i class="fas fa-times"></i>
+        </button>
+        
+        <div class="image-viewer-zoom">
+            <button class="image-viewer-zoom-btn" id="zoom-out-btn">
+                <i class="fas fa-search-minus"></i>
+            </button>
+            <button class="image-viewer-zoom-btn" id="zoom-in-btn">
+                <i class="fas fa-search-plus"></i>
+            </button>
+            <button class="image-viewer-zoom-btn" id="zoom-reset-btn">
+                <i class="fas fa-undo-alt"></i>
+            </button>
+        </div>
+        
+        <div class="image-viewer-main" id="image-viewer-main" style="cursor: grab; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;">
+            <img id="image-viewer-img" class="image-viewer-img" src="" alt="Fullscreen View" style="max-width: 90%; max-height: 90%; object-fit: contain; transition: transform 0.2s ease;">
+        </div>
+        
+        <div class="image-viewer-nav">
+            <button class="image-viewer-nav-btn" id="image-prev-btn">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <div class="image-viewer-counter" id="image-counter">
+                <span id="current-img-index">1</span> / <span id="total-img-count">0</span>
+            </div>
+            <button class="image-viewer-nav-btn" id="image-next-btn">
+                <i class="fas fa-chevron-right"></i>
+            </button>
+        </div>
+    </div>
+</div>        
+
+
+<!-- TERMS & CONDITIONS PAGE -->
+<div id="terms-page" class="page policy-page">
+    <header class="details-header policy-header">
+        <button class="back-btn" id="terms-back-btn">
+            <i class="fas fa-arrow-left"></i>
+        </button>
+        <h2>Terms & Conditions</h2>
+        <div style="width:40px;"></div>
+    </header>
+    
+    <div class="policy-content">
+        <div class="policy-hero">
+            <div class="policy-icon">
+                <i class="fas fa-file-contract"></i>
+            </div>
+            <h1>Terms of Service</h1>
+            <p>Last updated: March 2024</p>
+        </div>
+        
+        <div class="policy-card">
+            <div class="policy-section">
+                <div class="section-icon">
+                    <i class="fas fa-handshake"></i>
+                </div>
+                <div class="section-content">
+                    <h3>1. Acceptance of Terms</h3>
+                    <p>By accessing or using BookMyGame ("the Platform"), you agree to be bound by these Terms & Conditions. If you disagree with any part of these terms, you may not access the Platform. These terms apply to all users, including players, venue owners, and administrators.</p>
+                </div>
+            </div>
+            
+            <div class="policy-section">
+                <div class="section-icon">
+                    <i class="fas fa-user-check"></i>
+                </div>
+                <div class="section-content">
+                    <h3>2. User Accounts</h3>
+                    <p><strong>2.1 Account Creation:</strong> You must be at least 18 years old to create an account. You agree to provide accurate, current, and complete information during registration.</p>
+                    <p><strong>2.2 Account Security:</strong> You are responsible for maintaining the confidentiality of your login credentials. Notify us immediately of any unauthorized use of your account.</p>
+                    <p><strong>2.3 Account Types:</strong> BookMyGame offers three account types: Players (bookings), Venue Owners (list facilities), and Plot Owners (list empty grounds). Each account type has specific terms and privileges.</p>
+                </div>
+            </div>
+            
+            <div class="policy-section">
+                <div class="section-icon">
+                    <i class="fas fa-calendar-check"></i>
+                </div>
+                <div class="section-content">
+                    <h3>3. Booking & Payments</h3>
+                    <p><strong>3.1 Booking Confirmation:</strong> A booking is confirmed only after successful payment. You will receive a confirmation email and QR code entry pass.</p>
+                    <p><strong>3.2 Payment Processing:</strong> All payments are processed through secure UPI gateways. BookMyGame charges a platform fee of 10% on all bookings.</p>
+                    <p><strong>3.3 Pricing:</strong> All prices are displayed in Indian Rupees (₹) and are inclusive of applicable taxes unless stated otherwise.</p>
+                </div>
+            </div>
+            
+            <div class="policy-section">
+                <div class="section-icon">
+                    <i class="fas fa-trophy"></i>
+                </div>
+                <div class="section-content">
+                    <h3>4. Tournaments</h3>
+                    <p><strong>4.1 Tournament Registration:</strong> Teams registering for tournaments must provide accurate player information. Registration fees are non-refundable once confirmed.</p>
+                    <p><strong>4.2 Prize Distribution:</strong> Tournament prizes will be distributed within 7 business days after tournament completion, after deducting the platform fee (20%).</p>
+                    <p><strong>4.3 Code of Conduct:</strong> All participants must adhere to fair play principles. Unsportsmanlike conduct may result in disqualification without refund.</p>
+                </div>
+            </div>
+            
+            <div class="policy-section">
+                <div class="section-icon">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <div class="section-content">
+                    <h3>5. User Conduct</h3>
+                    <p>You agree not to:</p>
+                    <ul>
+                        <li>Use the Platform for any illegal purpose</li>
+                        <li>Harass, abuse, or harm other users</li>
+                        <li>Post false or misleading information</li>
+                        <li>Attempt to gain unauthorized access to our systems</li>
+                        <li>Interfere with the proper functioning of the Platform</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="policy-section">
+                <div class="section-icon">
+                    <i class="fas fa-ban"></i>
+                </div>
+                <div class="section-content">
+                    <h3>6. Termination</h3>
+                    <p>BookMyGame reserves the right to suspend or terminate accounts that violate these terms. Users may delete their accounts at any time through profile settings.</p>
+                </div>
+            </div>
+            
+            <div class="policy-section">
+                <div class="section-icon">
+                    <i class="fas fa-gavel"></i>
+                </div>
+                <div class="section-content">
+                    <h3>7. Limitation of Liability</h3>
+                    <p>BookMyGame acts as an intermediary platform. We are not liable for any injuries, damages, or losses arising from the use of venues or participation in activities. Venue owners are responsible for maintaining safe facilities.</p>
+                </div>
+            </div>
+            
+            <div class="policy-section">
+                <div class="section-icon">
+                    <i class="fas fa-envelope"></i>
+                </div>
+                <div class="section-content">
+                    <h3>8. Contact Information</h3>
+                    <p>For questions regarding these terms, contact us at: <strong>BookYourGame@gmail.com</strong></p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="policy-footer">
+            <p>By using BookMyGame, you acknowledge that you have read, understood, and agree to be bound by these Terms & Conditions.</p>
+            <button class="accept-policy-btn" onclick="goBack()">I Understand</button>
+        </div>
+    </div>
+</div>
+
+<!-- PRIVACY POLICY PAGE -->
+<div id="privacy-page" class="page policy-page">
+    <header class="details-header policy-header">
+        <button class="back-btn" id="privacy-back-btn">
+            <i class="fas fa-arrow-left"></i>
+        </button>
+        <h2>Privacy Policy</h2>
+        <div style="width:40px;"></div>
+    </header>
+    
+    <div class="policy-content">
+        <div class="policy-hero">
+            <div class="policy-icon">
+                <i class="fas fa-shield-alt"></i>
+            </div>
+            <h1>Privacy Policy</h1>
+            <p>Your privacy matters to us</p>
+        </div>
+        
+        <div class="policy-card">
+            <div class="policy-section">
+                <div class="section-icon">
+                    <i class="fas fa-database"></i>
+                </div>
+                <div class="section-content">
+                    <h3>1. Information We Collect</h3>
+                    <p><strong>Personal Information:</strong> Name, email address, phone number, date of birth, and profile photo.</p>
+                    <p><strong>Location Data:</strong> With your permission, we collect location information to show nearby venues.</p>
+                    <p><strong>Payment Information:</strong> We do not store payment details. All payments are processed through secure UPI gateways.</p>
+                    <p><strong>Usage Data:</strong> Information about how you interact with our platform, including bookings, searches, and preferences.</p>
+                </div>
+            </div>
+            
+            <div class="policy-section">
+                <div class="section-icon">
+                    <i class="fas fa-lock"></i>
+                </div>
+                <div class="section-content">
+                    <h3>2. How We Use Your Information</h3>
+                    <ul>
+                        <li>Process and confirm your bookings</li>
+                        <li>Communicate important updates about your bookings</li>
+                        <li>Improve and personalize your experience</li>
+                        <li>Process payments and payouts</li>
+                        <li>Verify owner identities</li>
+                        <li>Send promotional offers (with your consent)</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="policy-section">
+                <div class="section-icon">
+                    <i class="fas fa-share-alt"></i>
+                </div>
+                <div class="section-content">
+                    <h3>3. Information Sharing</h3>
+                    <p>We share your information only in the following circumstances:</p>
+                    <ul>
+                        <li><strong>With Venue Owners:</strong> Name and contact details for booking confirmation</li>
+                        <li><strong>With Service Providers:</strong> Payment processors and hosting services</li>
+                        <li><strong>Legal Requirements:</strong> When required by law or to protect rights</li>
+                    </ul>
+                    <p>We never sell your personal information to third parties.</p>
+                </div>
+            </div>
+            
+            <div class="policy-section">
+                <div class="section-icon">
+                    <i class="fas fa-cookie-bite"></i>
+                </div>
+                <div class="section-content">
+                    <h3>4. Cookies & Tracking</h3>
+                    <p>We use cookies to enhance your experience, remember preferences, and analyze usage. You can disable cookies in your browser settings, but this may affect platform functionality.</p>
+                </div>
+            </div>
+            
+            <div class="policy-section">
+                <div class="section-icon">
+                    <i class="fas fa-user-secret"></i>
+                </div>
+                <div class="section-content">
+                    <h3>5. Data Security</h3>
+                    <p>We implement industry-standard security measures including encryption, secure servers, and regular security audits. However, no method of transmission over the internet is 100% secure.</p>
+                </div>
+            </div>
+            
+            <div class="policy-section">
+                <div class="section-icon">
+                    <i class="fas fa-user-edit"></i>
+                </div>
+                <div class="section-content">
+                    <h3>6. Your Rights</h3>
+                    <p>You have the right to:</p>
+                    <ul>
+                        <li>Access your personal information</li>
+                        <li>Correct inaccurate information</li>
+                        <li>Request deletion of your account</li>
+                        <li>Opt out of marketing communications</li>
+                        <li>Download your data</li>
+                    </ul>
+                    <p>To exercise these rights, contact us at <strong>privacy@bookmygame.com</strong></p>
+                </div>
+            </div>
+            
+            <div class="policy-section">
+                <div class="section-icon">
+                    <i class="fas fa-child"></i>
+                </div>
+                <div class="section-content">
+                    <h3>7. Children's Privacy</h3>
+                    <p>BookMyGame is not intended for users under 18 years of age. We do not knowingly collect information from minors.</p>
+                </div>
+            </div>
+            
+            <div class="policy-section">
+                <div class="section-icon">
+                    <i class="fas fa-sync-alt"></i>
+                </div>
+                <div class="section-content">
+                    <h3>8. Updates to This Policy</h3>
+                    <p>We may update this privacy policy periodically. We will notify you of significant changes via email or through the platform.</p>
+                    <p>Last updated: March 2024</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="policy-footer">
+            <p>If you have questions about our privacy practices, please contact our Data Protection Officer at <strong>BookYourGame@gmail.com</strong></p>
+            <button class="accept-policy-btn" onclick="goBack()">Back to Profile</button>
+        </div>
+    </div>
+</div>
+
+<!-- CANCELLATION POLICY PAGE -->
+<div id="cancellation-page" class="page policy-page">
+    <header class="details-header policy-header">
+        <button class="back-btn" id="cancellation-back-btn">
+            <i class="fas fa-arrow-left"></i>
+        </button>
+        <h2>Cancellation Policy</h2>
+        <div style="width:40px;"></div>
+    </header>
+    
+    <div class="policy-content">
+        <div class="policy-hero">
+            <div class="policy-icon">
+                <i class="fas fa-times-circle"></i>
+            </div>
+            <h1>Cancellation Policy</h1>
+            <p>Know your cancellation rights</p>
+        </div>
+        
+        <div class="policy-card">
+            <div class="policy-section">
+                <div class="section-icon">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <div class="section-content">
+                    <h3>Cancellation Timeframes</h3>
+                    <div class="cancellation-timeline">
+                        <div class="timeline-item">
+                            <div class="timeline-badge success">
+                                <i class="fas fa-check"></i>
+                            </div>
+                            <div class="timeline-content">
+                                <h4>24+ Hours Before Booking</h4>
+                                <p>Full refund (100% of amount paid)</p>
+                                <span class="refund-badge">Full Refund</span>
+                            </div>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="timeline-badge warning">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                            <div class="timeline-content">
+                                <h4>12-24 Hours Before Booking</h4>
+                                <p>50% refund of amount paid</p>
+                                <span class="refund-badge partial">50% Refund</span>
+                            </div>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="timeline-badge danger">
+                                <i class="fas fa-ban"></i>
+                            </div>
+                            <div class="timeline-content">
+                                <h4>Less Than 12 Hours Before Booking</h4>
+                                <p>No refund</p>
+                                <span class="refund-badge none">No Refund</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="policy-section">
+                <div class="section-icon">
+                    <i class="fas fa-umbrella"></i>
+                </div>
+                <div class="section-content">
+                    <h3>Weather-Related Cancellations</h3>
+                    <p>If a venue cancels due to inclement weather, you will receive a 100% refund. BookMyGame will notify you via email and SMS.</p>
+                </div>
+            </div>
+            
+            <div class="policy-section">
+                <div class="section-icon">
+                    <i class="fas fa-building"></i>
+                </div>
+                <div class="section-content">
+                    <h3>Venue-Initiated Cancellations</h3>
+                    <p>If a venue cancels your booking for any reason, you will receive a 100% refund. We also offer a 20% discount coupon for your next booking as a goodwill gesture.</p>
+                </div>
+            </div>
+            
+            <div class="policy-section">
+                <div class="section-icon">
+                    <i class="fas fa-trophy"></i>
+                </div>
+                <div class="section-content">
+                    <h3>Tournament Cancellations</h3>
+                    <p>Tournament entry fees are non-refundable after registration confirmation. If a tournament is cancelled by the organizer, full refunds will be processed within 7 business days.</p>
+                </div>
+            </div>
+            
+            <div class="policy-section">
+                <div class="section-icon">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <div class="section-content">
+                    <h3>How to Cancel</h3>
+                    <ol>
+                        
+                    </ol>
+                    
+                </div>
+            </div>
+            
+            <div class="policy-note">
+                <i class="fas fa-info-circle"></i>
+                <p>Note: Platform fees are non-refundable in all cancellation scenarios as they cover processing costs and platform maintenance.</p>
+            </div>
+        </div>
+        
+        <div class="policy-footer">
+            <button class="accept-policy-btn" onclick="goBack()">Back to Profile</button>
+        </div>
+    </div>
+</div>
+
+<!-- REFUND POLICY PAGE -->
+<div id="refund-page" class="page policy-page">
+    <header class="details-header policy-header">
+        <button class="back-btn" id="refund-back-btn">
+            <i class="fas fa-arrow-left"></i>
+        </button>
+        <h2>Refund Policy</h2>
+        <div style="width:40px;"></div>
+    </header>
+    
+    <div class="policy-content">
+        <div class="policy-hero">
+            <div class="policy-icon">
+                <i class="fas fa-hand-holding-usd"></i>
+            </div>
+            <h1>Refund Policy</h1>
+            <p>How refunds are processed</p>
+        </div>
+        
+        <div class="policy-card">
+            <div class="policy-section">
+                <div class="section-icon">
+                    <i class="fas fa-wallet"></i>
+                </div>
+                <div class="section-content">
+                    <h3>Refund Process</h3>
+                    <div class="refund-steps">
+                        <div class="step">
+                            <div class="step-number">1</div>
+                            <div>Request cancellation through the app</div>
+                        </div>
+                        <div class="step-arrow"><i class="fas fa-arrow-right"></i></div>
+                        <div class="step">
+                            <div class="step-number">2</div>
+                            <div>Cancellation reviewed</div>
+                        </div>
+                        <div class="step-arrow"><i class="fas fa-arrow-right"></i></div>
+                        <div class="step">
+                            <div class="step-number">3</div>
+                            <div>Refund initiated (5-7 business days)</div>
+                        </div>
+                        <div class="step-arrow"><i class="fas fa-arrow-right"></i></div>
+                        <div class="step">
+                            <div class="step-number">4</div>
+                            <div>Amount credited to original payment method</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="policy-section">
+                <div class="section-icon">
+                    <i class="fas fa-percent"></i>
+                </div>
+                <div class="section-content">
+                    <h3>Refund Amounts</h3>
+                    <table class="refund-table">
+                        <thead>
+                            <tr>
+                                <th>Cancellation Time</th>
+                                <th>Refund Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>More than 24 hours before</td>
+                                <td><span class="refund-full">100%</span></td>
+                            </tr>
+                            <tr>
+                                <td>12-24 hours before</td>
+                                <td><span class="refund-partial">50%</span></td>
+                            </tr>
+                            <tr>
+                                <td>Less than 12 hours before</td>
+                                <td><span class="refund-none">0%</span></td>
+                            </tr>
+                            <tr>
+                                <td>Venue cancellation</td>
+                                <td><span class="refund-full">100% Refund</span></td>
+                            </tr>
+                            <tr>
+                                <td>Weather cancellation</td>
+                                <td><span class="refund-full">100%</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="policy-section">
+                <div class="section-icon">
+                    <i class="fas fa-credit-card"></i>
+                </div>
+                <div class="section-content">
+                    <h3>Payment Methods & Refund Timing</h3>
+                    <ul>
+                        <li><strong>UPI Payments:</strong> 3-5 business days</li>
+                        <li><strong>Card Payments:</strong> 5-7 business days</li>
+                        <li><strong>Wallet Payments:</strong> 2-3 business days</li>
+                        <li><strong>Net Banking:</strong> 5-7 business days</li>
+                    </ul>
+                    <p class="note">Timing depends on your bank or payment provider. Contact them for specific timelines.</p>
+                </div>
+            </div>
+            
+            <div class="policy-section">
+                <div class="section-icon">
+                    <i class="fas fa-ticket-alt"></i>
+                </div>
+                <div class="section-content">
+                    <h3>Promotional Offers & Discounts</h3>
+                    <p>If you used a coupon code or promotional offer:</p>
+                    <ul>
+                        <li>Refunds are calculated on the actual amount paid</li>
+                        <li>Coupon codes cannot be reused after cancellation</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="policy-note">
+                <i class="fas fa-exclamation-triangle"></i>
+                <p><strong>Important:</strong> If you do not receive your refund within the stated timeline, please contact our support team at <strong>BookYourGame@gmail.com</strong> with your booking ID and transaction details.</p>
+            </div>
+        </div>
+        
+        <div class="policy-footer">
+            <button class="accept-policy-btn" onclick="goBack()">Back to Profile</button>
+        </div>
+    </div>
+</div>
+
+<!-- OWNER AGREEMENT PAGE -->
+<div id="owner-agreement-page" class="page policy-page">
+    <header class="details-header policy-header">
+        <button class="back-btn" id="owner-agreement-back-btn">
+            <i class="fas fa-arrow-left"></i>
+        </button>
+        <h2>Owner Agreement</h2>
+        <div style="width:40px;"></div>
+    </header>
+    
+    <div class="policy-content">
+        <div class="policy-hero">
+            <div class="policy-icon">
+                <i class="fas fa-handshake"></i>
+            </div>
+            <h1>Owner Agreement</h1>
+            <p>For venue and ground owners</p>
+        </div>
+        
+        <div class="policy-card">
+            <div class="policy-section">
+                <div class="section-icon">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <div class="section-content">
+                    <h3>Commission Structure</h3>
+                    <div class="commission-grid">
+    <div class="commission-card">
+        <i class="fas fa-building"></i>
+        <h4>Venue Owners</h4>
+        <div class="commission-rate">10%</div>
+        <p>Platform fee per booking</p>
+        <span class="badge free">Free Registration</span>
+    </div>
+    <div class="commission-card">
+        <i class="fas fa-tree"></i>
+        <h4>Plot Owners</h4>
+        <div class="commission-rate">10%</div>
+        <p>Platform fee per booking</p>
+        <span class="badge free">Free Registration</span>
+    </div>
+</div>
+                    <p class="note">You receive 90% of every booking amount. Payouts are processed within 2-3 business days after booking completion.</p>
+                </div>
+            </div>
+            
+            <div class="policy-section">
+                <div class="section-icon">
+                    <i class="fas fa-money-bill-wave"></i>
+                </div>
+                <div class="section-content">
+                    <h3>Payout Process</h3>
+                    <ul>
+                        <li><strong>Minimum Payout:</strong> ₹500</li>
+                        <li><strong>Payout Frequency:</strong> Daily for eligible earnings</li>
+                        <li><strong>Payout Method:</strong> UPI transfer to registered UPI ID</li>
+                        <li><strong>Processing Time:</strong> 2-3 business days after request approval</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="policy-section">
+                <div class="section-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="section-content">
+                    <h3>Verification Requirements</h3>
+                    <p>To become a verified owner, you must submit:</p>
+                    <ul>
+                        <li>Aadhaar Card (Front & Back)</li>
+                        <li>PAN Card</li>
+                        <li>Valid UPI ID for payouts</li>
+                        <li>Venue/Ground photos (minimum 3)</li>
+                    </ul>
+                    <p>Verification typically takes 2-3 business days. Verified owners get priority in search results.</p>
+                </div>
+            </div>
+            
+            <div class="policy-section">
+                <div class="section-icon">
+                    <i class="fas fa-list-ul"></i>
+                </div>
+                <div class="section-content">
+                    <h3>Listing Guidelines</h3>
+                    <ul>
+                        <li>Provide accurate and up-to-date information about your facility</li>
+                        <li>Upload clear, high-quality photos of the actual ground/venue</li>
+                        <li>Maintain competitive pricing</li>
+                        <li>Keep slot availability updated</li>
+                        <li>Respond to booking requests promptly</li>
+                        <li>Honor confirmed bookings</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="policy-section">
+                <div class="section-icon">
+                    <i class="fas fa-ban"></i>
+                </div>
+                <div class="section-content">
+                    <h3>Prohibited Activities</h3>
+                    <ul>
+                        <li>Misrepresenting your facility or services</li>
+                        <li>Cancelling confirmed bookings without valid reason</li>
+                        <li>Discrimination against any user</li>
+                        <li>Operating without proper permits or licenses</li>
+                        <li>Engaging in fraudulent activities</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="policy-section">
+                <div class="section-icon">
+                    <i class="fas fa-star"></i>
+                </div>
+                <div class="section-content">
+                    <h3>Performance Standards</h3>
+                    <p>To maintain good standing, owners should aim for:</p>
+                    <ul>
+                        <li><strong>Acceptance Rate:</strong> >95% of booking requests</li>
+                        <li><strong>Cancellation Rate:</strong> <5% of confirmed bookings</li>
+                        <li><strong>Response Time:</strong> <2 hours on average</li>
+                        <li><strong>Rating:</strong> Maintain 4+ star rating</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="policy-section">
+                <div class="section-icon">
+                    <i class="fas fa-hand-holding-usd"></i>
+                </div>
+                <div class="section-content">
+                    
+                    
+                    <ul>
+                    
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="policy-section">
+                <div class="section-icon">
+                    <i class="fas fa-gavel"></i>
+                </div>
+                <div class="section-content">
+                    <h3>Termination & Suspension</h3>
+                    <p>BookMyGame reserves the right to suspend or terminate accounts that:</p>
+                    <ul>
+                        <li>Violate these terms</li>
+                        <li>Receive multiple user complaints</li>
+                        <li>Engage in fraudulent activities</li>
+                        <li>Fail to maintain performance standards</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="policy-note">
+                <i class="fas fa-info-circle"></i>
+                <p><strong>Acceptance:</strong> By listing your ground on BookMyGame, you acknowledge that you have read, understood, and agree to be bound by this Owner Agreement. This agreement is effective from the date of your first listing.</p>
+            </div>
+        </div>
+        
+        <div class="policy-footer">
+            <p>For questions about this agreement, contact: <strong>BookYourGame@gmail.com</strong></p>
+            <button class="accept-policy-btn" onclick="goBack()">Back to Profile</button>
+        </div>
+    </div>
+</div>
+        <!-- OWNER DASHBOARD (Updated with Payment Banner) -->
+        <div id="owner-dashboard-page" class="page">
+            <header class="details-header">
+                <button class="back-btn" id="owner-dashboard-back-btn">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <h2>Owner Dashboard</h2>
+                <button class="edit-btn" id="owner-profile-btn">
+                    <i class="fas fa-user"></i>
+                </button>
+            </header>
+            <!-- Owner Registration Payment Banner (for unpaid owners) -->
+<div id="owner-reg-payment-banner" class="owner-reg-payment-banner" style="display: none;">
+    <div class="banner-content">
+        <div class="banner-icon">
+            <i class="fas fa-lock"></i>
+        </div>
+        <div class="banner-text">
+            <h3>Complete Registration to List Grounds</h3>
+            <p>Pay ₹499 once and start listing your grounds instantly!</p>
+        </div>
+        <button class="pay-owner-fee-btn" id="pay-owner-reg-fee-btn">
+            <i class="fas fa-credit-card"></i> Pay ₹499 Now
+        </button>
+    </div>
+</div>
+            <div class="owner-info-bar" id="owner-id-display"></div>
+            
+            <!-- Payment Required Banner (for plot owners only) -->
+            <div id="plot-owner-payment-banner" class="payment-required-banner" style="display: none;">
+                <div class="banner-content">
+                    <i class="fas fa-lock"></i>
+                    <div>
+                        <h3>One-Time Payment Required</h3>
+                        <p>Pay ₹299 once to start listing your grounds. Lifetime access!</p>
+                    </div>
+                    <button class="pay-now-btn" id="pay-registration-now">Pay ₹299 Now</button>
+                </div>
+            </div>
+            
+            <div class="dashboard-tabs">
+                <button class="tab-btn active" id="owner-overview-tab">Overview</button>
+                <button class="tab-btn" id="owner-grounds-tab">Grounds</button>
+                <button class="tab-btn" id="owner-bookings-tab">Bookings</button>
+                <button class="tab-btn" id="owner-earnings-tab">Earnings</button>
+
+                <button class="tab-btn" id="owner-payouts-tab">Payouts</button>
+                <button class="tab-btn" id="owner-verification-tab">Verification</button>
+                <button class="tab-btn bmg-promote-tab-btn" id="owner-promote-tab">🚀 Promote</button>
+                
+            </div>
+            
+            <div class="dashboard-content" id="owner-dashboard-content">
+                <div class="loading-spinner">
+                    <div class="loader-spinner"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- OWNER VERIFICATION MODAL (NEW) -->
+        <div id="owner-verification-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Verify Your Identity</h3>
+                    <button class="close-btn" id="close-verification-modal">&times;</button>
+                </div>
+                <form id="owner-verification-form">
+                    <div class="form-group">
+                        <label>Aadhaar Number</label>
+                        <input type="text" id="aadhaar-number" class="modal-input" maxlength="12" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>PAN Number</label>
+                        <input type="text" id="pan-number" class="modal-input" maxlength="10" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Upload Aadhaar Front</label>
+                        <input type="file" id="aadhaar-front" accept="image/*" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Upload Aadhaar Back</label>
+                        <input type="file" id="aadhaar-back" accept="image/*" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Upload PAN Card</label>
+                        <input type="file" id="pan-image" accept="image/*" required>
+                    </div>
+                    
+                    <button type="submit" class="submit-btn">Submit for Verification</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- REPORT ISSUE MODAL (NEW) -->
+        <div id="report-issue-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Report an Issue</h3>
+                    <button class="close-btn" id="close-report-modal">&times;</button>
+                </div>
+                <form id="report-issue-form">
+                    <div class="form-group">
+                        <label>Issue Type</label>
+                        <select id="issue-type" class="modal-select" required>
+                            <option value="venue_issue">Venue Problem</option>
+                            <option value="booking_issue">Booking Issue</option>
+                            <option value="payment_issue">Payment Issue</option>
+                            <option value="owner_issue">Owner Issue</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea id="issue-description" rows="4" class="modal-input" required></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Upload Photos (Optional)</label>
+                        <input type="file" id="issue-images" multiple accept="image/*">
+                    </div>
+                    
+                    <button type="submit" class="submit-btn">Submit Report</button>
+                </form>
+            </div>
+        </div>
+
+<!-- PAYOUT REQUEST MODAL -->
+<div id="payout-request-modal" class="modal">
+    <div class="modal-content" style="max-width: 500px; max-height: 85vh; display: flex; flex-direction: column; border-radius: 28px; overflow: hidden;">
+        <div class="modal-header" style="background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: white; border: none; flex-shrink: 0;">
+            <div class="modal-header-left">
+                <div class="modal-icon" style="background: rgba(255,255,255,0.2);">
+                    <i class="fas fa-money-bill-wave"></i>
+                </div>
+                <div>
+                    <h3 style="color: white; margin: 0;">Request Payout</h3>
+                    <p class="modal-subtitle" style="color: rgba(255,255,255,0.8); margin: 4px 0 0;">Withdraw your earnings</p>
+                </div>
+            </div>
+            <button class="close-btn" id="close-payout-request-modal" style="color: white; background: rgba(255,255,255,0.2);">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body" style="padding: 0; overflow-y: auto; flex: 1;">
+            <div class="payout-request-content" id="payout-request-content"></div>
+        </div>
+    </div>
+</div>
+
+        <!-- ADMIN DASHBOARD -->
+        <!-- ADMIN DASHBOARD -->
+<div id="admin-dashboard-page" class="page">
+    <header class="details-header">
+        <button class="back-btn" id="admin-dashboard-back-btn">
+            <i class="fas fa-arrow-left"></i>
+        </button>
+        <h2>Admin Dashboard</h2>
+        <div style="width:40px;"></div>
+    </header>
+    
+    <div class="admin-info-bar" id="admin-id-display"></div>
+    
+    <div class="admin-tabs">
+        <button class="tab-btn active" id="admin-overview-tab">Overview</button>
+        <button class="tab-btn" id="admin-owners-tab">Owners</button>
+        <button class="tab-btn" id="admin-venues-tab">Venues</button>
+        <button class="tab-btn" id="admin-bookings-tab">Bookings</button>
+
+        <button class="tab-btn" id="admin-payouts-tab">Payouts</button>
+        <button class="tab-btn" id="admin-verification-tab">Verification</button>
+        <button class="tab-btn" id="admin-reports-tab">Reports</button>
+        <button class="tab-btn" id="admin-document-verification-tab">Address Verification</button>
+        <button class="tab-btn" id="admin-delete-tab" style="background: linear-gradient(135deg, #ef4444, #dc2626); color: white;">
+            <i class="fas fa-trash-alt"></i> Delete Management
+        </button>
+    </div>
+    
+    <div class="dashboard-content" id="admin-dashboard-content">
+        <div class="loading-spinner">
+            <div class="loader-spinner"></div>
+        </div>
+    </div>
+</div>
+
+        <!-- OWNER VERIFICATION REQUESTS MODAL (ADMIN) -->
+        <div id="verification-requests-modal" class="modal">
+            <div class="modal-content modal-lg">
+                <div class="modal-header">
+                    <h3>Verification Requests</h3>
+                    <button class="close-btn" id="close-verification-requests-modal">&times;</button>
+                </div>
+                <div id="verification-requests-list" class="verification-list"></div>
+            </div>
+            <!-- Add this inside the verification-form-card, before the submit button -->
+<div id="verification-upload-progress" class="verification-upload-progress" style="display: none;">
+    <div class="progress-bar-wrapper">
+        <div class="progress-bar-fill" id="verification-upload-progress-fill"></div>
+    </div>
+    <span id="upload-status-text">Uploading documents...</span>
+</div>
+        </div>
+
+        <!-- PAYOUT REQUESTS MODAL (ADMIN) -->
+        <div id="payout-requests-modal" class="modal">
+            <div class="modal-content modal-lg">
+                <div class="modal-header">
+                    <h3>Payout Requests</h3>
+                    <button class="close-btn" id="close-payout-requests-modal">&times;</button>
+                </div>
+                <div id="payout-requests-list" class="payout-list"></div>
+            </div>
+        </div>
+
+        <!-- CEO DASHBOARD -->
+        <div id="ceo-dashboard-page" class="page">
+            <header class="details-header">
+                <button class="back-btn" id="ceo-dashboard-back-btn">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <!-- Add this to the ceo-tabs div in index.html -->
+<button class="tab-btn" id="ceo-verification-tab">Verification</button>
+                <h2>CEO Dashboard</h2>
+                <div style="width:40px;"></div>
+            </header>
+            
+            <div class="ceo-info-bar" id="ceo-id-display"></div>
+            
+            <div class="ceo-tabs">
+                <button class="tab-btn active" id="ceo-overview-tab">Overview</button>
+                <button class="tab-btn" id="ceo-admins-tab">Admins</button>
+                <button class="tab-btn" id="ceo-owners-tab">Owners</button>
+                <button class="tab-btn" id="ceo-bookings-tab">Bookings</button>
+
+                <button class="tab-btn" id="ceo-payouts-tab">Payouts</button>
+                <button class="tab-btn" id="ceo-analytics-tab">Analytics</button>
+                <button class="tab-btn" id="ceo-referrals-tab">Referrals</button>
+            </div>
+            
+            <div class="dashboard-content" id="ceo-dashboard-content">
+                <div class="loading-spinner">
+                    <div class="loader-spinner"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ADD GROUND MODAL (Updated with payment check) -->
+        <!-- ADD GROUND MODAL - Enhanced Professional Design -->
+<!-- ADD GROUND MODAL - Fixed Scrolling -->
+<div id="add-ground-modal" class="modal">
+    <div class="modal-content modal-lg" style="max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; border-radius: 28px;">
+        <div class="modal-header" style="flex-shrink: 0;">
+            <div class="modal-header-left">
+                <div class="modal-icon">
+                    <i class="fas fa-plus-circle"></i>
+                </div>
+                <button class="add-ground-btn" id="add-ground-btn">
+    <i class="fas fa-plus"></i>
+    Add New Ground
+</button>
+            </div>
+            <button class="close-btn" id="close-add-ground-modal">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <!-- Progress Steps -->
+        <div class="progress-steps" id="progress-steps" style="flex-shrink: 0; padding: var(--space-xl) var(--space-xl) 0;">
+            <div class="progress-step active" data-step="1">
+                <div class="step-number">1</div>
+                <div class="step-label">Basic Info</div>
+            </div>
+            <div class="progress-step" data-step="2">
+                <div class="step-number">2</div>
+                <div class="step-label">Pricing</div>
+            </div>
+            <div class="progress-step" data-step="3">
+                <div class="step-number">3</div>
+                <div class="step-label">Confirm</div>
+            </div>
+        </div>
+        
+        <!-- Scrollable Form Body -->
+        <div class="modal-body" style="flex: 1; overflow-y: auto; padding: 0;">
+            <form id="add-ground-form" class="add-ground-form" novalidate>
+                <!-- Step 1: Basic Information -->
+                <div class="form-step active" data-step="1">
+                    <div class="step-content">
+                        <div class="form-card">
+                            <div class="form-card-header">
+                                <i class="fas fa-info-circle"></i>
+                                <h4>Ground Details</h4>
+                            </div>
+                            
+                            <div class="form-group-modern">
+                                <label class="form-label">
+                                    <i class="fas fa-tag"></i>
+                                    Ground Name* (If you have swimming pool add "Swimming Pool" name)
+                                </label>
+                                <input type="text" id="ground-name-input" class="form-input-modern" 
+                                       placeholder="e.g., Main Turf, Court 1, Indoor Arena" required>
+                                <div class="form-hint">Give your ground a unique and descriptive name</div>
+                            </div>
+                            
+                            <div class="form-group-modern">
+                                <label class="form-label">
+                                    <i class="fas fa-futbol"></i>
+                                    Sport Type *
+                                </label>
+                                <select id="ground-sport-input" class="form-select-modern" required>
+                                    <option value="" disabled selected>Select a sport</option>
+                                    <option value="cricket">🏏 Cricket</option>
+                                    <option value="football">⚽ Football</option>
+                                    <option value="badminton">🏸 Badminton</option>
+                                    <option value="tennis">🎾 Tennis</option>
+                                    <option value="basketball">🏀 Basketball</option>
+                                    <option value="volleyball">🏐 Volleyball</option>
+                                    <option value="swimming">🏊 Swimming</option>
+                                    <option value="multi">🎯 Multi-Sport</option>
+                                </select>
+                                <div class="form-hint">Select the primary sport for this ground</div>
+                            </div>
+                            
+                            <div class="form-group-modern">
+                                <label class="form-label">
+                                    <i class="fas fa-map-pin"></i>
+                                    Ground Specific Address (mandatory for plot and ground owners)
+                                </label>
+                                <input type="text" id="ground-address-input" class="form-input-modern" 
+                                       placeholder="e.g., Near Gate 2, Side Court, Indoor Hall">
+                                <div class="form-hint">Help players find the exact location within your venue</div>
+                            </div>
+                            
+                            <div class="form-group-modern">
+                                <label class="form-label">
+                                    <i class="fas fa-city"></i>
+                                    City Name * <span style="color:#e53e3e;font-size:12px;">(Required — users will search by city)</span>
+                                </label>
+                                <input type="text" id="ground-city-input" class="form-input-modern" 
+                                       placeholder="e.g., Delhi, Mumbai, Ghaziabad" required data-required="true">
+                                <div class="form-hint">Enter the city where your ground is located</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Step 2: Pricing -->
+                <div class="form-step" data-step="2">
+                    <div class="step-content">
+                        <div class="form-card">
+                            <div class="form-card-header">
+                                <i class="fas fa-rupee-sign"></i>
+                                <h4>Pricing Information</h4>
+                            </div>
+                            
+                            <div class="form-group-modern">
+                                <label class="form-label">
+                                    <i class="fas fa-clock"></i>
+                                    Price per Hour *
+                                </label>
+                                <select id="ground-price-input" class="form-input-modern" data-required="true" style="padding-left: 16px;">
+                                    <option value="">-- Select Price per Hour --</option>
+                                    <option value="1">₹1 / hour</option>
+                                    <option value="2">₹2 / hour</option>
+                                    <option value="99">₹99 / hour</option>
+                                    <option value="199">₹199 / hour</option>
+                                    <option value="299">₹299 / hour</option>
+                                    <option value="499">₹499 / hour</option>
+                                    <option value="799">₹799 / hour</option>
+                                    <option value="999">₹999 / hour</option>
+                                    <option value="1299">₹1,299 / hour</option>
+                                    <option value="1999">₹1,999 / hour</option>
+                                    <option value="2499">₹2,499 / hour</option>
+                                </select>
+                                <div class="form-hint">Select a fixed price per hour for booking</div>
+                            </div>
+                            
+                            <div class="earning-preview">
+                                <div class="earning-preview-header">
+                                    <i class="fas fa-chart-line"></i>
+                                    <span>Earnings Preview</span>
+                                </div>
+                                <div class="earning-preview-details">
+                                    <div class="earning-item">
+                                        <span>Customer Pays:</span>
+                                        <span class="customer-price">₹0</span>
+                                    </div>
+                                    <div class="earning-item">
+                                        <span>Platform Fee (10%):</span>
+                                        <span class="platform-fee">₹0</span>
+                                    </div>
+                                    <div class="earning-item total">
+                                        <span>You Receive:</span>
+                                        <span class="owner-earning">₹0</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Step 3: Photos -->
+                <div class="form-step" data-step="3">
+                    <div class="step-content">
+                        <div class="form-card">
+                            <div class="form-card-header">
+                                <i class="fas fa-camera"></i>
+                                <h4>Add Photos (Optional)</h4>
+                            </div>
+                            
+                            <div class="form-group-modern">
+                                <label class="form-label">
+                                    <i class="fas fa-images"></i>
+                                    Ground Photos
+                                </label>
+                                
+                                <!-- Cloudinary Upload Button -->
+                                <div class="cloudinary-upload-section">
+                                    <button type="button" class="cloudinary-upload-btn" id="cloudinary-upload-btn">
+                                        <i class="fas fa-cloud-upload-alt"></i>
+                                        Upload Photos
+                                    </button>
+                                    <p class="upload-hint">Click to select photos (Max 10, up to 5MB each)</p>
+                                </div>
+                                
+                                <!-- Traditional file input -->
+                                <div class="traditional-upload">
+                                    <div class="upload-area" id="upload-area">
+                                        <div class="upload-icon">
+                                            <i class="fas fa-cloud-upload-alt"></i>
+                                        </div>
+                                        <h4>Click or Drag & Drop Photos</h4>
+                                        <p>JPEG, PNG or WebP (Max 5MB each)</p>
+                                        <p class="upload-requirement">Photos are optional - you can add them now or later</p>
+                                        <button type="button" class="upload-btn" id="select-photos-btn">Select Photos</button>
+                                    </div>
+                                    <input type="file" id="ground-images" multiple accept="image/jpeg,image/png,image/jpg,image/webp" style="display: none;">
+                                </div>
+                                
+                                <div class="image-preview-grid" id="image-preview-grid">
+                                    <div class="preview-placeholder">
+                                        <i class="fas fa-camera"></i>
+                                        <p>No photos selected yet</p>
+                                        <span>Photos are optional (you can add them later)</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="info-note" style="background: var(--primary-50); margin-top: var(--space-lg);">
+                                <i class="fas fa-info-circle"></i>
+                                <span>Images are uploaded securely to Cloudinary CDN for fast delivery worldwide.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            <!-- Navigation Buttons - inside form so submit-ground-btn works -->
+            <div class="form-navigation" style="flex-shrink: 0; background: var(--white); border-top: 1px solid var(--gray-200);">
+                <button type="button" class="nav-btn prev-btn" id="prev-step-btn" disabled>
+                    <i class="fas fa-arrow-left"></i> Previous
+                </button>
+                <button type="button" class="nav-btn next-btn" id="next-step-btn">
+                    Next <i class="fas fa-arrow-right"></i>
+                </button>
+                <button type="button" class="nav-btn submit-btn" id="submit-ground-btn" style="display: none;">
+                    <i class="fas fa-check-circle"></i> Add Ground
+                </button>
+            </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+        <!-- REGISTRATION PAYMENT MODAL (For plot owners) -->
+        <!-- registration-payment-modal: now just a redirect shell.
+             All payment goes through Cashfree SDK via showOwnerRegistrationPayment().
+             Kept in DOM so existing close-btn wiring doesn't break. -->
+        <div id="registration-payment-modal" class="modal">
+            <div class="modal-content" style="max-width:360px;text-align:center;">
+                <div class="modal-header">
+                    <h3>Complete Registration</h3>
+                    <button class="close-btn" id="close-reg-payment-modal">&times;</button>
+                </div>
+                <div class="modal-body" style="padding:28px 24px 32px;">
+                    <div style="font-size:3rem;margin-bottom:12px;">🏟️</div>
+                    <h2 style="margin:0 0 6px;font-size:1.4rem;">One-Time Fee</h2>
+                    <div style="font-size:2.2rem;font-weight:800;color:var(--primary,#6366f1);margin:10px 0;">₹499</div>
+                    <p style="color:#6b7280;font-size:.9rem;margin-bottom:20px;">Pay once and list unlimited grounds forever</p>
+                    <ul style="text-align:left;list-style:none;padding:0;margin:0 0 24px;font-size:.88rem;color:#374151;">
+                        <li style="padding:5px 0;"><i class="fas fa-check" style="color:#22c55e;margin-right:8px;"></i>List unlimited grounds</li>
+                        <li style="padding:5px 0;"><i class="fas fa-check" style="color:#22c55e;margin-right:8px;"></i>90% of every booking revenue</li>
+                        <li style="padding:5px 0;"><i class="fas fa-check" style="color:#22c55e;margin-right:8px;"></i>All UPI, Cards, Net Banking supported</li>
+                        <li style="padding:5px 0;"><i class="fas fa-check" style="color:#22c55e;margin-right:8px;"></i>Lifetime access — no renewals</li>
+                    </ul>
+                    <button id="reg-modal-pay-btn" onclick="closeModal('registration-payment-modal'); showOwnerRegistrationPayment();"
+                        style="width:100%;padding:14px;background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;border:none;border-radius:12px;font-size:1rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;">
+                        <i class="fas fa-lock"></i> Pay ₹499 Securely
+                    </button>
+                    <p style="margin-top:12px;font-size:.72rem;color:#9ca3af;">
+                        <i class="fas fa-shield-alt" style="color:#6366f1;"></i>
+                        Secured by Cashfree · PCI DSS Compliant · All payment methods accepted
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        
+
+        <!-- CREATE ADMIN MODAL -->
+        <div id="create-admin-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Create New Admin</h3>
+                    <button class="close-btn" id="close-create-admin-modal">&times;</button>
+                </div>
+                <form id="create-admin-form">
+                    <!-- ... existing admin form fields ... -->
+                </form>
+            </div>
+        </div>
+<!-- TOURNAMENT REGISTRATIONS MODAL (Owner View) -->
+<!-- TOURNAMENT REGISTRATIONS MODAL (Owner View) -->
+
+        <!-- LOADING OVERLAY -->
+        <div id="loading-overlay" class="loading-overlay" style="display: none;">
+            <div class="loader-spinner"></div>
+            <p id="loading-message">Processing...</p>
+        </div>
+
+        <!-- TOAST CONTAINER -->
+        <div id="toast-container" class="toast-container"></div>
+    </div>
+
+<!-- Cloudinary Configuration -->
+<script>
+    // Cloudinary Configuration
+    window.CLOUDINARY_CONFIG = {
+        cloudName: 'dirvssdze',  // Replace with your Cloudinary cloud name
+        uploadPreset: 'bookmygame_grounds',  // You'll create this in Cloudinary dashboard
+        folder: 'Grounds',
+        maxFileSize: 5000000, // 5MB
+        allowedFormats: ['jpg', 'png', 'jpeg', 'webp']
+    };
+</script>
+
+
+<!-- Cloudinary SDK -->
+<script src="https://upload-widget.cloudinary.com/global/all.js" type="text/javascript"></script>
+
+
+
+<!-- Detect Capacitor and handle back button -->
+<script>
+    if (window.Capacitor) {
+        // Handle hardware back button
+        window.Capacitor.Plugins.App.addListener('backButton', () => {
+            if (window.confirm('Do you want to exit the app?')) {
+                window.Capacitor.Plugins.App.exitApp();
+            }
+        });
+        
+        // Handle app state changes
+        window.Capacitor.Plugins.App.addListener('appStateChange', (state) => {
+            console.log('App state changed:', state);
+        });
+    }
+
+
+
+</script>
+<!-- Cashfree Form Configuration -->
+<!-- Cashfree Form Configuration -->
+<script>
+    window.CASHFREE_CONFIG = {
+        formId: '204072888',
+        formLink: 'https://payments.cashfree.com/forms/gamer',
+        mode: 'production'
+    };
+    console.log('Cashfree config loaded:', window.CASHFREE_CONFIG);204072888
+</script>
+<!-- PAYMENT VERIFICATION MODAL -->
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     UNIFIED PAYMENT SYSTEM — v2
+     Payment UI is now a floating overlay injected by paymentService.js.
+     No full-page redirect. Cashfree SDK opens a popup (_modal).
+     This page block is kept only for stale-session recovery fallback.
+     ══════════════════════════════════════════════════════════════════════ -->
+<div id="payment-processing-page" class="page" style="display:none;
+     flex-direction:column; align-items:center; justify-content:center;
+     min-height:100vh; background:#ffffff; padding:40px 24px; text-align:center;">
+    <div style="width:56px;height:56px;border:5px solid #e5e7eb;
+         border-top-color:#6366f1;border-radius:50%;
+         animation:bmg_spin 1s linear infinite;margin-bottom:24px;"></div>
+    <h2 style="font-size:1.4rem;font-weight:700;color:#1a1a2e;margin-bottom:8px;">
+        <i class="fas fa-shield-alt" style="color:#6366f1;margin-right:8px;"></i>
+        Verifying Payment
+    </h2>
+    <p id="processing-status-text" style="color:#6b7280;font-size:.9rem;
+       max-width:280px;line-height:1.6;margin-bottom:20px;">
+        Please wait while we confirm your payment…
+    </p>
+    <div style="background:#f8f9fa;border-radius:12px;padding:10px 18px;
+         font-size:.78rem;color:#9ca3af;">
+        <i class="fas fa-lock" style="color:#6366f1;margin-right:5px;"></i>
+        Secured by Cashfree · PCI DSS Compliant
+    </div>
+    <p style="font-size:.72rem;color:#d1d5db;margin-top:14px;">
+        Order: <span id="processing-order-id" style="font-family:monospace;"></span>
+    </p>
+</div>
+<style>@keyframes bmg_spin{to{transform:rotate(360deg)}}</style>
+<!-- ══ END PAYMENT PROCESSING PAGE ══════════════════════════════════════════ -->
+
+<!-- Load order: paymentService FIRST, then app.js -->
+<script src="paymentService.js"></script>
+<script src="app.js"></script>
+<script src="sportobook_patches_merged.js"></script>
+<script src="bmg_fixes_combined.js"></script>
+<script src="all_patches_combined.js"></script>
+<script src="pool_ground_limit_and_admin_fix.js"></script>
+<script src="pool_member_price_fix.js"></script>
+<script src="EARNINGS_UPCOMING_BOOKED_FIX.js"></script>
+<script src="SLOT_BOOKED_DISPLAY_FIX.js"></script>
+<!-- ══════════════════════════════════════════════════════════════════
+     MASTER GLOBAL EVENT DELEGATOR
+     Single capture-phase listener covering EVERY button in the app.
+     Works for static AND dynamically injected elements.
+     Uses closest() so clicking a child (icon, span, img) still fires.
+     ══════════════════════════════════════════════════════════════════ -->
+<script>
+(function() {
+    // Helper: safely call a fn if it exists
+    function call(name, ...args) {
+        if (typeof window[name] === 'function') window[name](...args);
+    }
+
+    // ID → action map for every named button / link in the app
+    const ID_MAP = {
+        // ── Bottom nav ─────────────────────────────────────────────
+        'nav-home'         : () => call('showHome'),
+        'nav-bookings'     : () => call('showBookings'),
+        'nav-profile'      : () => call('showProfile'),
+
+        // ── Header ────────────────────────────────────────────────
+        'profile-btn'           : () => call('showProfile'),
+        'header-qr-scanner'     : () => call('toggleProfessionalQRScanner'),
+        'payment-verify-icon'   : () => call('showPaymentVerification') || call('showPaymentVerificationModal'),
+        'refresh-location'      : () => call('getUserLocation'),
+
+        // ── Home page ─────────────────────────────────────────────
+        'view-all-venues'      : () => call('loadAllVenuesPage'),
+
+        // ── Auth ──────────────────────────────────────────────────
+        'google-signin-btn'          : () => call('handleGoogleSignIn'),
+        'google-signin-btn-register' : () => call('handleGoogleSignIn'),
+        'forgot-password-link'       : (e) => call('handleForgotPassword', e),
+        'show-owner-register-link'   : () => call('showOwnerTypeSelection'),
+        'reg-terms-link'             : () => call('showTerms'),
+        'venue-owner-terms-link'     : () => call('showTerms'),
+        'plot-owner-terms-link'      : () => call('showTerms'),
+        'select-venue-owner'         : () => call('showVenueOwnerRegister') || call('showPage', 'venue-owner-register-page'),
+        'select-plot-owner'          : () => call('showPlotOwnerRegister') || call('showPage', 'plot-owner-register-page'),
+
+        // ── Back buttons ──────────────────────────────────────────
+        'owner-type-back-btn'            : () => call('goBack'),
+        'venue-owner-register-back-btn'  : () => call('goBack'),
+        'plot-owner-register-back-btn'   : () => call('goBack'),
+        'venue-back-btn'                 : () => call('goBack'),
+        'ground-back-btn'                : () => call('goBack'),
+        'booking-back-btn'               : () => { call('clearBookingSession'); call('goBack'); },
+        'confirmation-home-btn'          : () => call('goBack'),
+        'entry-pass-back-btn'            : () => call('goBack'),
+        'bookings-back-btn'              : () => call('goBack'),
+        'profile-back-btn'               : () => call('goBack'),
+        'owner-dashboard-back-btn'       : () => call('goBack'),
+        'admin-dashboard-back-btn'       : () => call('goBack'),
+        'ceo-dashboard-back-btn'         : () => call('goBack'),
+        'all-venues-back-btn'            : () => call('goBack'),
+        'my-matches-back-btn'            : () => call('goBack'),
+        'terms-back-btn'                 : () => call('goBack'),
+        'privacy-back-btn'               : () => call('goBack'),
+        'cancellation-back-btn'          : () => call('goBack'),
+        'refund-back-btn'                : () => call('goBack'),
+        'owner-agreement-back-btn'       : () => call('goBack'),
+
+        // ── Venue / Ground page ───────────────────────────────────
+        'share-venue-btn'       : () => call('shareVenue'),
+        'report-venue-issue'    : () => call('showModal','report-issue-modal') || (document.getElementById('report-issue-modal') && (document.getElementById('report-issue-modal').style.display = 'flex')),
+        'write-review-btn'      : () => call('showWriteReview'),
+        'gallery-prev'          : () => call('prevGallerySlide'),
+        'gallery-next'          : () => call('nextGallerySlide'),
+        'sticky-book-now'       : () => call('showBookingPage', window.currentGround),
+
+        // ── Booking / Confirmation ────────────────────────────────
+        'view-entry-pass-btn'   : () => call('showEntryPassFromConfirmation'),
+        'back-to-home-btn'      : () => call('goHome'),
+        'share-whatsapp'        : () => call('shareToWhatsApp') || call('shareViaWhatsApp'),
+        'share-facebook'        : () => call('shareToFacebook'),
+        'share-twitter'         : () => call('shareToTwitter'),
+        'copy-link'             : () => call('copyShareLink'),
+
+        // ── Profile page ──────────────────────────────────────────
+        'edit-profile-btn'          : () => call('editProfile'),
+        'change-photo-btn'          : () => call('changeProfilePhoto'),
+        'profile-bookings-link'     : () => call('showBookings'),
+        'owner-dashboard-link'      : () => call('showOwnerDashboard'),
+        'admin-dashboard-link'      : () => call('showAdminDashboard'),
+        'ceo-dashboard-link'        : () => call('showCEODashboard'),
+        'terms-menu-link'           : () => call('showTerms'),
+        'privacy-menu-link'         : () => call('showPrivacyPolicy'),
+        'owner-agreement-menu-link' : () => call('showOwnerAgreement'),
+        'referral-link'             : () => { if(typeof showToast==='function') showToast('Share your referral code to earn rewards!','info'); },
+        'logout-btn'                : () => call('logout'),
+        'owner-profile-btn'         : () => call('showProfile'),
+        'my-matches-link'           : () => call('showMyMatches'),
+
+        // ── Bookings tabs ─────────────────────────────────────────
+        'bookings-upcoming' : () => call('loadUserBookings', 'upcoming'),
+        'bookings-past'     : () => call('loadUserBookings', 'past'),
+
+        // ── My Matches tabs ───────────────────────────────────────
+        'matches-upcoming' : () => call('loadAllMatchesPage', 'upcoming'),
+        'matches-past'     : () => call('loadAllMatchesPage', 'past'),
+        'matches-hosted'   : () => call('loadAllMatchesPage', 'hosted'),
+
+        // ── Owner dashboard ───────────────────────────────────────
+        'owner-overview-tab'       : () => call('loadOwnerDashboard', 'overview'),
+        'owner-grounds-tab'        : () => call('loadOwnerDashboard', 'grounds'),
+        'owner-bookings-tab'       : () => call('loadOwnerDashboard', 'bookings'),
+        'owner-earnings-tab'       : () => call('loadOwnerDashboard', 'earnings'),
+        'owner-payouts-tab'        : () => call('loadOwnerDashboard', 'payouts'),
+        'owner-verification-tab'   : () => call('loadOwnerDashboard', 'verification'),
+        'owner-payment-verify-tab' : () => call('loadOwnerDashboard', 'payment-verify'),
+        'owner-promote-tab'        : () => call('loadOwnerDashboard', 'promote'),
+        'pay-owner-reg-fee-btn'    : () => call('showRegistrationPaymentModal'),
+        'pay-registration-now'     : () => call('showRegistrationPaymentModal'),
+        'complete-registration-btn': () => call('completeOwnerRegistration') || call('showRegistrationPaymentModal'),
+
+        // ── Admin dashboard tabs ──────────────────────────────────
+        'admin-overview-tab'              : () => call('loadAdminDashboard', 'overview'),
+        'admin-owners-tab'                : () => call('loadAdminDashboard', 'owners'),
+        'admin-venues-tab'                : () => call('loadAdminDashboard', 'venues'),
+        'admin-bookings-tab'              : () => call('loadAdminDashboard', 'bookings'),
+        'admin-payouts-tab'               : () => call('loadAdminDashboard', 'payouts'),
+        'admin-verification-tab'          : () => call('loadAdminDashboard', 'verification'),
+        'admin-reports-tab'               : () => call('loadAdminDashboard', 'reports'),
+        'admin-document-verification-tab' : () => call('loadAdminDashboard', 'document-verification'),
+        'admin-delete-tab'                : () => call('loadAdminDashboard', 'delete'),
+
+        // ── CEO dashboard tabs ────────────────────────────────────
+        'ceo-overview-tab'     : () => call('loadCEODashboard', 'overview'),
+        'ceo-admins-tab'       : () => call('loadCEODashboard', 'admins'),
+        'ceo-owners-tab'       : () => call('loadCEODashboard', 'owners'),
+        'ceo-bookings-tab'     : () => call('loadCEODashboard', 'bookings'),
+        'ceo-payouts-tab'      : () => call('loadCEODashboard', 'payouts'),
+        'ceo-analytics-tab'    : () => call('loadCEODashboard', 'analytics'),
+        'ceo-referrals-tab'    : () => call('loadCEODashboard', 'referrals'),
+        'ceo-verification-tab' : () => call('loadCEODashboard', 'verification'),
+
+        // ── Modals – close buttons ────────────────────────────────
+        'close-add-ground-modal'           : () => call('closeModal', 'add-ground-modal'),
+        'close-slot-management-modal'      : () => call('closeModal', 'slot-management-modal'),
+        'close-create-admin-modal'         : () => call('closeModal', 'create-admin-modal'),
+        'close-edit-profile-modal'         : () => call('closeModal', 'edit-profile-modal'),
+        'close-write-review-modal'         : () => call('closeModal', 'write-review-modal'),
+        'close-verification-modal'         : () => call('closeModal', 'owner-verification-modal'),
+        'close-host-payment-verify-modal'  : () => call('closeModal', 'host-payment-verify-modal'),
+        'close-host-payment-success-modal' : () => call('closeModal', 'host-payment-success-modal'),
+        'close-host-payment-failed-modal'  : () => call('closeModal', 'host-payment-failed-modal'),
+        'close-report-modal'               : () => call('closeModal', 'report-issue-modal'),
+        'close-payout-request-modal'       : () => call('closeModal', 'payout-request-modal'),
+        'close-payout-requests-modal'      : () => call('closeModal', 'payout-requests-modal'),
+        'close-verification-requests-modal': () => call('closeModal', 'verification-requests-modal'),
+        'close-reg-payment-modal'          : () => call('closeModal', 'registration-payment-modal'),
+        'close-result-btn'                 : () => call('closeVerificationResultModal'),
+        'host-payment-close-btn'           : () => call('closeModal', 'host-payment-success-modal'),
+        'host-payment-failed-close-btn'    : () => call('closeModal', 'host-payment-failed-modal'),
+
+        // ── QR Scanner ────────────────────────────────────────────
+        'close-professional-qr' : () => call('closeProfessionalQRScanner'),
+        'close-scanner-btn'     : () => call('closeProfessionalQRScanner'),
+        'toggle-torch'          : () => call('toggleTorch'),
+        'select-from-gallery'   : () => call('selectFromGallery'),
+        'verify-another-btn'    : () => { call('closeVerificationResultModal'); call('toggleProfessionalQRScanner'); },
+
+        // ── Image viewer ──────────────────────────────────────────
+        'image-viewer-close' : () => call('closeImageViewer'),
+        'zoom-in-btn'        : () => call('zoomImageViewerIn'),
+        'zoom-out-btn'       : () => call('zoomImageViewerOut'),
+        'zoom-reset-btn'     : () => call('resetImageViewerTransform'),
+        'image-prev-btn'     : () => call('prevImageViewerImage'),
+        'image-next-btn'     : () => call('nextImageViewerImage'),
+
+        // ── Add Ground modal steps ────────────────────────────────
+        'prev-step-btn'         : () => call('prevStep'),
+        'next-step-btn'         : () => call('nextStep'),
+        'cloudinary-upload-btn' : () => call('openCloudinaryWidget') || call('initCloudinaryUpload'),
+        'select-photos-btn'     : () => call('selectGroundPhotos') || document.getElementById('ground-photos-input')?.click(),
+
+        // ── Tournament steps ──────────────────────────────────────
+
+        // ── Add Ground submit ─────────────────────────────────────
+        'submit-ground-btn'   : () => call('handleAddGround', { preventDefault: ()=>{}, stopPropagation: ()=>{} }),
+
+        // ── Retry / misc ──────────────────────────────────────────
+        'retry-payment-btn'    : () => call('retryPayment') || call('goBack'),
+        'view-created-match-btn': () => call('showMyMatches'),
+    };
+
+    // CLASS / data-attribute map for repeated dynamic elements
+    const CLASS_ACTIONS = [
+        // Sport filter chips on home page
+        { sel: '[data-sport]',       fn: (el) => call('filterBySport', el.dataset.sport) },
+        // Tournament filter tabs
+        { sel: '[data-filter]',      fn: (el) => {
+            const f = el.dataset.filter;
+            if (el.closest('.all-venues-filters')) {
+                call('filterTournaments', f) || call('filterAllVenues', f, '');
+            }
+        }},
+        // Booking tabs active swap
+        { sel: '.tab-btn',           fn: (el) => {
+            const id = el.id;
+            if (!id) return;
+            // Already handled by ID_MAP above for known IDs — skip
+            if (ID_MAP[id]) return;
+            // Generic: find sibling tabs and activate
+            el.closest('.tabs,.tab-bar,.tab-container,.booking-tabs')
+              ?.querySelectorAll('.tab-btn')
+              .forEach(t => t.classList.remove('active'));
+            el.classList.add('active');
+        }},
+    ];
+
+    document.addEventListener('click', function(e) {
+        // Walk up from target to find a match
+        let node = e.target;
+        while (node && node !== document) {
+            // 1. Check ID_MAP
+            if (node.id && ID_MAP[node.id]) {
+                e.preventDefault();
+                try { ID_MAP[node.id](e); } catch(err) { console.warn('[BMG delegator] error on', node.id, err); }
+                return;
+            }
+            // 2. Check class/data actions
+            for (const rule of CLASS_ACTIONS) {
+                if (node.matches && node.matches(rule.sel)) {
+                    e.preventDefault();
+                    try { rule.fn(node); } catch(err) { console.warn('[BMG delegator] class action error', err); }
+                    return;
+                }
+            }
+            node = node.parentElement;
+        }
+    }, true); // capture phase — fires before any inline handlers can stop propagation
+
+    console.log('[BMG] Master event delegator installed');
+    window.handleAddGround = window.handleAddGround || function(){};
+})();
+</script>
+
+<!-- ══ SUPER FIX — must load LAST, overrides all prior patches ══ -->
+</body>
+</html>
