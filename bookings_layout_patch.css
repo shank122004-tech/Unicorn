@@ -1,0 +1,333 @@
+/* ═══════════════════════════════════════════════════════════════
+   bookings_layout_patch.css  v3
+   Add in index.html AFTER styles.css:
+     <link rel="stylesheet" href="bookings_layout_patch.css">
+═══════════════════════════════════════════════════════════════ */
+
+/* ── Hide original UI elements ──────────────────────────────── */
+#bookings-page > .bookings-list      { display: none !important; }
+#pool-passes-section                 { display: none !important; }
+#bookings-page > .bookings-tabs      { display: none !important; }
+
+/* ════════════════════════════════════════════════════════════
+   PAGE BASE
+════════════════════════════════════════════════════════════ */
+#bookings-page {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    background: #f0f4ff;
+}
+
+/* ════════════════════════════════════════════════════════════
+   STICKY HEADER
+════════════════════════════════════════════════════════════ */
+#bookings-page .page-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(255,255,255,0.97);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: none;
+    box-shadow: 0 1px 0 #e8edf8;
+    margin: 0;
+}
+
+/* ════════════════════════════════════════════════════════════
+   3-TAB BAR
+════════════════════════════════════════════════════════════ */
+.bmg-tab-bar {
+    position: sticky;
+    top: 56px;
+    z-index: 99;
+    background: #fff;
+    display: flex;
+    align-items: stretch;
+    border-bottom: 2px solid #e8edf8;
+    box-shadow: 0 3px 10px rgba(15,31,92,0.07);
+    padding: 0;
+}
+
+.bmg-tab-btn {
+    flex: 1;
+    padding: 12px 4px 10px;
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #9ca3af;
+    cursor: pointer;
+    transition: all .2s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    letter-spacing: -0.1px;
+    white-space: nowrap;
+    font-family: inherit;
+}
+.bmg-tab-btn .bmg-tab-icon { font-size: 17px; line-height: 1; }
+
+.bmg-tab-btn.active                        { color: #1d4ed8; border-bottom: 3px solid #2563eb; }
+.bmg-tab-btn[data-tab="pools"].active      { color: #0369a1; border-bottom-color: #0ea5e9; }
+.bmg-tab-btn:not(.active):hover            { color: #374151; background: #f9fafb; }
+
+.bmg-tab-pill {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 16px; height: 16px; padding: 0 4px;
+    border-radius: 8px; font-size: 9px; font-weight: 800;
+    background: #e0f2fe; color: #0369a1; margin-left: 3px;
+}
+.bmg-tab-pill:empty { display: none; }
+
+/* ════════════════════════════════════════════════════════════
+   TAB PANELS
+════════════════════════════════════════════════════════════ */
+.bmg-tab-panel {
+    display: none;
+    flex: 1;
+    padding: 0 0 90px;
+}
+.bmg-tab-panel.active { display: block; }
+
+/* ════════════════════════════════════════════════════════════
+   SECTION GROUPS (Grounds / Pools)
+════════════════════════════════════════════════════════════ */
+.bmg-section {
+    margin: 14px 14px 0;
+}
+
+.bmg-sec-head {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 14px;
+    border-radius: 12px 12px 0 0;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    margin-bottom: 0;
+}
+.bmg-sec-head--grounds {
+    background: linear-gradient(135deg, #eff6ff, #dbeafe);
+    color: #1d4ed8;
+    border-bottom: 2px solid #bfdbfe;
+}
+.bmg-sec-head--pools {
+    background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+    color: #0369a1;
+    border-bottom: 2px solid #bae6fd;
+}
+.bmg-sec-count {
+    margin-left: auto;
+    background: rgba(0,0,0,0.08);
+    color: inherit;
+    border-radius: 10px;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 800;
+    min-width: 20px;
+    text-align: center;
+}
+
+.bmg-cards-wrap {
+    background: transparent;
+    padding: 10px 0 4px;
+}
+
+/* ════════════════════════════════════════════════════════════
+   LOADING / EMPTY STATES
+════════════════════════════════════════════════════════════ */
+.bmg-loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 32px 0;
+}
+.bmg-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 28px 16px;
+    text-align: center;
+    gap: 8px;
+}
+.bmg-empty-icon  { font-size: 32px; opacity: .35; }
+.bmg-empty-msg   { font-size: 13px; font-weight: 600; color: #9ca3af; line-height: 1.5; }
+.bmg-empty--error .bmg-empty-msg { color: #ef4444; }
+
+/* ════════════════════════════════════════════════════════════
+   BOOKING CARDS — base
+════════════════════════════════════════════════════════════ */
+.bmg-card {
+    background: #fff;
+    border-radius: 16px;
+    margin-bottom: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(15,31,92,0.08);
+    transition: transform .18s, box-shadow .18s;
+    border-top: 3px solid transparent;
+}
+.bmg-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(15,31,92,0.13);
+}
+
+/* Status accents */
+.bmg-card--confirmed  { border-top-color: #22c55e; }
+.bmg-card--completed  { border-top-color: #6366f1; }
+.bmg-card--cancelled  { border-top-color: #ef4444; }
+.bmg-card--pending    { border-top-color: #f59e0b; }
+.bmg-card--past       { border-top-color: #94a3b8; opacity: .88; }
+
+/* Pool card left accent instead of top */
+.bmg-pool-card {
+    border-top: none;
+    border-left: 4px solid #0ea5e9;
+}
+.bmg-pool-card.bmg-card--confirmed { border-left-color: #22c55e; }
+.bmg-pool-card.bmg-card--past      { border-left-color: #94a3b8; }
+.bmg-pool-card.bmg-card--cancelled { border-left-color: #ef4444; }
+
+/* ── Card header ────────────────────────────────────────────── */
+.bmg-card-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 14px 14px 10px;
+}
+.bmg-pool-header { padding-bottom: 10px; }
+
+.bmg-card-badge {
+    width: 38px; height: 38px;
+    border-radius: 10px;
+    background: #f0f4ff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+}
+.bmg-pool-badge { background: #e0f2fe; }
+
+.bmg-card-title { flex: 1; min-width: 0; }
+.bmg-card-name  {
+    font-size: 14px; font-weight: 700; color: #0f1f5c;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    margin-bottom: 3px;
+}
+.bmg-card-sub   {
+    font-size: 11.5px; color: #6b7280;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ── Status pill ────────────────────────────────────────────── */
+.bmg-status-pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px 9px; border-radius: 20px;
+    font-size: 10px; font-weight: 700;
+    white-space: nowrap; flex-shrink: 0;
+}
+.bmg-status-pill--confirmed  { background: #dcfce7; color: #15803d; }
+.bmg-status-pill--completed  { background: #ede9fe; color: #5b21b6; }
+.bmg-status-pill--cancelled  { background: #fee2e2; color: #b91c1c; }
+.bmg-status-pill--pending    { background: #fef3c7; color: #92400e; }
+.bmg-status-pill--past       { background: #f1f5f9; color: #64748b; }
+
+/* ── Card body ──────────────────────────────────────────────── */
+.bmg-card-body {
+    padding: 4px 14px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    border-top: 1px solid #f0f4ff;
+    border-bottom: 1px solid #f0f4ff;
+}
+.bmg-info-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    font-size: 13px;
+    color: #374151;
+    line-height: 1.4;
+}
+.bmg-info-row i {
+    width: 15px; text-align: center;
+    color: #6b7280; font-size: 12px; flex-shrink: 0;
+    margin-top: 2px;
+}
+
+/* ── Alert bar ──────────────────────────────────────────────── */
+.bmg-alert {
+    display: flex; align-items: center; gap: 7px;
+    background: #fffbeb; color: #92400e;
+    font-size: 11.5px; font-weight: 600;
+    padding: 7px 14px;
+    border-top: 1px solid #fde68a;
+}
+.bmg-alert i { color: #f59e0b; }
+
+/* ── Card footer ────────────────────────────────────────────── */
+.bmg-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 14px 12px;
+    flex-wrap: wrap;
+}
+.bmg-booking-id {
+    font-size: 11px; color: #9ca3af; font-weight: 600;
+    display: flex; align-items: center; gap: 4px;
+}
+.bmg-booking-id i { font-size: 10px; }
+
+.bmg-card-actions {
+    display: flex;
+    gap: 7px;
+    flex-wrap: wrap;
+}
+
+/* Buttons */
+.bmg-pass-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 8px 14px;
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    color: #fff; border: none;
+    border-radius: 22px; font-size: 12px; font-weight: 700;
+    cursor: pointer; letter-spacing: -0.1px;
+    transition: all .18s; white-space: nowrap;
+    font-family: inherit;
+}
+.bmg-pass-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(37,99,235,0.4);
+}
+.bmg-pool-btn {
+    background: linear-gradient(135deg, #0369a1, #0ea5e9);
+}
+.bmg-pool-btn:hover {
+    box-shadow: 0 4px 14px rgba(14,165,233,0.4);
+}
+.bmg-cancel-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 8px 12px;
+    background: transparent; color: #ef4444;
+    border: 1.5px solid #fca5a5; border-radius: 22px;
+    font-size: 12px; font-weight: 700; cursor: pointer;
+    transition: all .18s; white-space: nowrap;
+    font-family: inherit;
+}
+.bmg-cancel-btn:hover {
+    background: #fee2e2; border-color: #ef4444;
+}
+
+.bmg-done-chip, .bmg-cancel-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11.5px; font-weight: 700; padding: 6px 10px;
+    border-radius: 20px;
+}
+.bmg-done-chip   { background: #ede9fe; color: #5b21b6; }
+.bmg-cancel-chip { background: #fee2e2; color: #b91c1c; }

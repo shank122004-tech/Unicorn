@@ -1,0 +1,359 @@
+/* ═══════════════════════════════════════════════════════════════
+   city_filter_patch.css
+   Add in index.html AFTER styles.css:
+     <link rel="stylesheet" href="city_filter_patch.css">
+═══════════════════════════════════════════════════════════════ */
+
+/* ════════════════════════════════════════════════════════════
+   CITY BAR  (sticky below location bar on home page)
+════════════════════════════════════════════════════════════ */
+.bmg-city-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
+    padding: 9px 14px;
+    border-radius: 0;
+    position: relative;
+    overflow: hidden;
+}
+.bmg-city-bar::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Ccircle cx='30' cy='30' r='20'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    pointer-events: none;
+}
+
+@keyframes bmgCityPulse {
+    0%   { opacity: 1; }
+    50%  { opacity: 0.6; }
+    100% { opacity: 1; }
+}
+.bmg-city-bar--pulse .bmg-city-name {
+    animation: bmgCityPulse 0.6s ease;
+}
+
+.bmg-city-bar-left {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex: 1;
+    min-width: 0;
+}
+.bmg-city-icon {
+    color: rgba(255,255,255,0.75);
+    font-size: 13px;
+    flex-shrink: 0;
+}
+.bmg-city-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.75);
+    white-space: nowrap;
+}
+.bmg-city-name {
+    font-size: 13px;
+    font-weight: 800;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    letter-spacing: -0.2px;
+}
+
+.bmg-city-change-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 6px 11px;
+    border-radius: 20px;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: all .18s;
+    font-family: inherit;
+    backdrop-filter: blur(4px);
+}
+.bmg-city-change-btn:hover {
+    background: rgba(255,255,255,0.25);
+    transform: translateY(-1px);
+}
+
+/* ════════════════════════════════════════════════════════════
+   CITY MODAL OVERLAY
+════════════════════════════════════════════════════════════ */
+.bmg-city-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(10,20,60,0.6);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    z-index: 9999;
+    display: flex;
+    align-items: flex-end;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .25s;
+}
+.bmg-city-modal-overlay.active {
+    opacity: 1;
+    pointer-events: all;
+}
+
+/* ════════════════════════════════════════════════════════════
+   CITY MODAL SHEET
+════════════════════════════════════════════════════════════ */
+.bmg-city-modal {
+    background: #fff;
+    border-radius: 24px 24px 0 0;
+    width: 100%;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    transform: translateY(100%);
+    transition: transform .3s cubic-bezier(.4,0,.2,1);
+    overflow: hidden;
+}
+.bmg-city-modal-overlay.active .bmg-city-modal {
+    transform: translateY(0);
+}
+
+/* Handle bar */
+.bmg-city-modal::before {
+    content: '';
+    display: block;
+    width: 40px;
+    height: 4px;
+    border-radius: 2px;
+    background: #e2e8f0;
+    margin: 10px auto 0;
+    flex-shrink: 0;
+}
+
+/* ── Modal header ── */
+.bmg-city-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px 10px;
+    flex-shrink: 0;
+}
+.bmg-city-modal-title {
+    font-size: 17px;
+    font-weight: 800;
+    color: #0f1f5c;
+    letter-spacing: -0.3px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.bmg-city-modal-title i { color: #2563eb; }
+.bmg-city-modal-close {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    background: #f0f4ff;
+    border: none;
+    color: #374151;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all .15s;
+    font-family: inherit;
+}
+.bmg-city-modal-close:hover { background: #e0e7ff; color: #1d4ed8; }
+
+/* ── Search input ── */
+.bmg-city-search-wrap {
+    position: relative;
+    padding: 0 16px 12px;
+    flex-shrink: 0;
+    border-bottom: 1px solid #f0f4ff;
+}
+.bmg-city-search-icon {
+    position: absolute;
+    left: 28px;
+    top: 50%;
+    transform: translateY(-60%);
+    color: #9ca3af;
+    font-size: 14px;
+    pointer-events: none;
+}
+.bmg-city-search-input {
+    width: 100%;
+    padding: 11px 14px 11px 38px;
+    border-radius: 12px;
+    border: 2px solid #e8edf8;
+    font-size: 14px;
+    font-family: inherit;
+    color: #0f1f5c;
+    background: #f8faff;
+    outline: none;
+    box-sizing: border-box;
+    transition: border-color .18s;
+}
+.bmg-city-search-input:focus { border-color: #2563eb; background: #fff; }
+
+/* ── City results list ── */
+.bmg-city-results {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+    -webkit-overflow-scrolling: touch;
+}
+.bmg-city-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 13px 18px;
+    cursor: pointer;
+    transition: background .15s;
+    border-bottom: 1px solid #f8faff;
+}
+.bmg-city-item:hover { background: #f0f4ff; }
+.bmg-city-item--active {
+    background: #eff6ff;
+}
+.bmg-city-item-icon {
+    color: #2563eb;
+    font-size: 13px;
+    width: 16px;
+    flex-shrink: 0;
+}
+.bmg-city-item--active .bmg-city-item-icon { color: #1d4ed8; }
+.bmg-city-item-name {
+    flex: 1;
+    font-size: 15px;
+    font-weight: 600;
+    color: #0f1f5c;
+}
+.bmg-city-item--active .bmg-city-item-name { color: #1d4ed8; font-weight: 700; }
+.bmg-city-item-count {
+    font-size: 11px;
+    color: #9ca3af;
+    font-weight: 500;
+}
+.bmg-city-item-check {
+    color: #2563eb;
+    font-size: 13px;
+    flex-shrink: 0;
+}
+
+/* Loading, empty, error states inside modal */
+.bmg-city-loading,
+.bmg-city-empty,
+.bmg-city-error {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 30px 16px;
+    text-align: center;
+    font-size: 14px;
+    color: #9ca3af;
+    font-weight: 600;
+}
+.bmg-city-error { color: #ef4444; }
+
+/* ── Modal footer ── */
+.bmg-city-modal-footer {
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid #f0f4ff;
+    flex-shrink: 0;
+}
+.bmg-city-all-btn {
+    width: 100%;
+    padding: 13px;
+    border: 2px solid #e8edf8;
+    border-radius: 14px;
+    background: #f8faff;
+    color: #374151;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all .18s;
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+.bmg-city-all-btn:hover { background: #f0f4ff; border-color: #c7d2fe; color: #1d4ed8; }
+
+/* ════════════════════════════════════════════════════════════
+   NO-RESULTS STATE (shown in grids when city has no content)
+════════════════════════════════════════════════════════════ */
+.bmg-city-no-results {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 36px 20px;
+    gap: 10px;
+}
+.bmg-city-no-results-icon {
+    font-size: 40px;
+    opacity: .35;
+}
+.bmg-city-no-results-text {
+    font-size: 14px;
+    color: #6b7280;
+    font-weight: 600;
+    line-height: 1.5;
+}
+.bmg-city-try-change-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 22px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: 4px;
+    font-family: inherit;
+    transition: all .18s;
+}
+.bmg-city-try-change-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(37,99,235,0.4);
+}
+
+/* ════════════════════════════════════════════════════════════
+   SIGNUP CITY AUTOCOMPLETE
+════════════════════════════════════════════════════════════ */
+.reg-city-suggestions {
+    background: #fff;
+    border: 2px solid #e8edf8;
+    border-radius: 12px;
+    margin-top: -8px;
+    margin-bottom: 12px;
+    overflow: hidden;
+    box-shadow: 0 8px 24px rgba(15,31,92,0.1);
+    z-index: 100;
+    position: relative;
+}
+.reg-city-sug-item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 11px 14px;
+    font-size: 14px;
+    color: #374151;
+    font-weight: 500;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f4ff;
+    transition: background .12s;
+}
+.reg-city-sug-item:last-child { border-bottom: none; }
+.reg-city-sug-item:hover { background: #f0f4ff; color: #1d4ed8; }
+.reg-city-sug-item i { color: #2563eb; font-size: 12px; flex-shrink: 0; }
