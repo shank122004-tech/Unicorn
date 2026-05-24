@@ -2317,10 +2317,12 @@
           : `<div style="background:#fffbeb;border:1.5px solid #fde68a;border-radius:14px;padding:14px;display:flex;align-items:center;gap:10px;">
               <i class="fas fa-info-circle" style="color:#f59e0b;font-size:16px;"></i>
               <div>
-                <div style="font-weight:700;color:#92400e;font-size:13px;">${bal.earned > 0 ? 'No Balance Available' : 'No Earnings Yet'}</div>
+                <div style="font-weight:700;color:#92400e;font-size:13px;">${bal.earned > 0 ? (bal.locked > 0 ? 'Payout In Progress' : 'All Earnings Transferred') : 'No Earnings Yet'}</div>
                 <div style="font-size:12px;color:#b45309;">${bal.locked > 0
                     ? `${_fmt(bal.locked)} is under a pending payout request.`
-                    : 'Earnings appear here after your first confirmed booking.'}</div>
+                    : bal.transferred > 0
+                      ? `${_fmt(bal.transferred)} has been paid out to your account.`
+                      : 'Earnings appear here after your first confirmed booking.'}</div>
               </div>
             </div>`}
       `;
@@ -3100,12 +3102,14 @@
       }
     });
 
-    // FALLBACK: If no owner_transfers records exist (legacy data before the feature
-    // was added), treat paid payout_requests as the transferred amount to prevent
-    // the same earnings from showing as available again after payment is confirmed.
+    // NOTE: We do NOT fall back to paid payout_requests as 'transferred'.
+    // Bookings that were paid out already have payoutStatus:'payout_done' and are
+    // excluded from totalEarned above. Using paid payout_requests as an additional
+    // deduction would double-count: once via exclusion from earned, once here.
+    // If owner_transfers is empty, transferred = 0 and available = earned.
     if (totalTransferred === 0 && paidFromRequests > 0) {
-      totalTransferred = paidFromRequests;
-      warn('owner_transfers empty — using paid payout_requests as fallback for transferred amount:', totalTransferred);
+      // Do NOT set totalTransferred = paidFromRequests (causes double-deduction)
+      warn('[payout-fix] owner_transfers empty; paidFromRequests ignored to prevent double-deduction. Earned:', totalEarned);
     }
 
     const available = Math.max(0, totalEarned - totalTransferred - totalLocked);
@@ -3251,10 +3255,12 @@
           : `<div style="background:#fffbeb;border:1.5px solid #fde68a;border-radius:14px;padding:14px;display:flex;align-items:center;gap:10px;">
               <i class="fas fa-info-circle" style="color:#f59e0b;font-size:16px;"></i>
               <div>
-                <div style="font-weight:700;color:#92400e;font-size:13px;">${bal.earned > 0 ? 'No Balance Available' : 'No Earnings Yet'}</div>
+                <div style="font-weight:700;color:#92400e;font-size:13px;">${bal.earned > 0 ? (bal.locked > 0 ? 'Payout In Progress' : 'All Earnings Transferred') : 'No Earnings Yet'}</div>
                 <div style="font-size:12px;color:#b45309;">${bal.locked > 0
                     ? `${_fmt(bal.locked)} is under a pending payout request.`
-                    : 'Earnings appear here after your first confirmed booking.'}</div>
+                    : bal.transferred > 0
+                      ? `${_fmt(bal.transferred)} has been paid out to your account.`
+                      : 'Earnings appear here after your first confirmed booking.'}</div>
               </div>
             </div>`}
       `;
@@ -3756,10 +3762,12 @@
       }
     });
 
-    // Fallback: if no owner_transfers exist, use paid payout_requests
+    // NOTE: Do NOT fall back to paid payout_requests as 'transferred'.
+    // payout_done bookings are already excluded from totalEarned, so adding
+    // paidFromRequests here would double-deduct those amounts.
     if (totalTransferred === 0 && paidFromRequests > 0) {
-      totalTransferred = paidFromRequests;
-      W('owner_transfers empty — fallback to paid payout_requests:', totalTransferred);
+      // Do NOT set totalTransferred = paidFromRequests (double-deduction bug)
+      W('[payout-fix] owner_transfers empty; paidFromRequests ignored to prevent double-deduction. Earned:', totalEarned);
     }
 
     const available = Math.max(0, totalEarned - totalTransferred - totalLocked);
@@ -3958,10 +3966,12 @@
             : `<div style="background:#fffbeb;border:1.5px solid #fde68a;border-radius:14px;padding:14px;display:flex;align-items:center;gap:10px;">
                 <i class="fas fa-info-circle" style="color:#f59e0b;font-size:16px;"></i>
                 <div>
-                  <div style="font-weight:700;color:#92400e;font-size:13px;">${bal.earned > 0 ? 'No Balance Available' : 'No Earnings Yet'}</div>
+                  <div style="font-weight:700;color:#92400e;font-size:13px;">${bal.earned > 0 ? (bal.locked > 0 ? 'Payout In Progress' : 'All Earnings Transferred') : 'No Earnings Yet'}</div>
                   <div style="font-size:12px;color:#b45309;">${bal.locked > 0
                       ? `${_fmt(bal.locked)} is under a pending payout request.`
-                      : 'Earnings appear here after your first confirmed booking.'}</div>
+                      : bal.transferred > 0
+                        ? `${_fmt(bal.transferred)} has been paid out to your account.`
+                        : 'Earnings appear here after your first confirmed booking.'}</div>
                 </div>
               </div>`}
         `;
