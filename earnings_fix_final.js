@@ -1,78 +1,96 @@
 /**
  * ═══════════════════════════════════════════════════════════════
- *  OWNER EARNINGS FIX — earnings_fix_final.js
+ *  SPORTOBOOK COMBINED FIX — earnings_fix_final.js
  *  Load this as the VERY LAST script in index.html (after all others)
  *
- *  ROOT CAUSE FIXED:
- *  1. app.js declares `async function loadOwnerEarnings()` as a named
- *     function. When loadOwnerDashboard (also in app.js) calls
- *     `loadOwnerEarnings(container)`, JavaScript resolves it via the
- *     local scope binding — NOT window.loadOwnerEarnings — so every
- *     patch from paymentService.js / combined_patches.js that sets
- *     window.loadOwnerEarnings is completely bypassed.
- *     FIX: Override loadOwnerDashboard so it always reads
- *     window.loadOwnerEarnings at call-time instead of the stale
- *     local binding.
+ *  FIXES INCLUDED:
  *
- *  2. paymentService.js's _earningsFn skips bookings with
- *     payoutStatus === 'payout_done', which is correct for "available
- *     balance" — but it was ALSO being used as the "Total Earned"
- *     figure, causing totals to drop to zero after any payout.
- *     FIX: computeRealBalance (combined_patches.js Section 6) is the
- *     authoritative renderer and does NOT exclude paid-out bookings
- *     from the totals — it subtracts received amounts separately.
- *     This fix ensures that renderer is always the one invoked.
+ *  [FIX 1] Owner earnings always showing ₹0
+ *    — app.js declares loadOwnerEarnings() as a named function, so
+ *      loadOwnerDashboard() resolves it via JS local scope, completely
+ *      bypassing every window.loadOwnerEarnings patch from paymentService
+ *      and combined_patches. Fixed by overriding loadOwnerDashboard to
+ *      read window.loadOwnerEarnings at call-time.
  *
- *  3. ownerAmount = 0 on old/Cashfree bookings: if a booking was
- *     confirmed before ownerAmount was stored, the field is 0 or
- *     missing. computeRealBalance already falls back to amount * 0.9,
- *     which this fix preserves.
+ *  [FIX 2] Total Earned drops to ₹0 after any payout is processed
+ *    — paymentService._earningsFn skips payout_done bookings even when
+ *      computing "Total Earned", so the total zeroes out post-payout.
+ *      Fixed by using computeRealBalance() which counts all confirmed
+ *      bookings in the total and subtracts received amounts separately.
  *
- *  4. Pool bookings: Firestore stores status in BOTH `status` and
- *     `bookingStatus` fields (inconsistently). combined_patches queries
- *     both — this fix keeps that behaviour.
+ *  [FIX 3] Pool bookings missing from earnings
+ *    — Firestore stores confirmed status in both `status` and
+ *      `bookingStatus` fields inconsistently. Fixed by querying both
+ *      fields and deduplicating by document ID.
+ *
+ *  [FIX 4] "Page not found: my-bookings-page" console error
+ *    — Three patch files call showPage('my-bookings-page') but the
+ *      actual <div> in index.html is id="bookings-page". Fixed by
+ *      intercepting showPage() and remapping the wrong id to the real one.
+ *      Affected callers:
+ *        • combined_patches.js:1509  — upcoming booking banner click
+ *        • app.js:32082              — tournament success modal button
+ *        • sportobook_patches_merged.js:2180 — entry-pass skip button
  * ═══════════════════════════════════════════════════════════════
  */
 (function () {
   'use strict';
 
-  /* ── helpers ── */
-  const log  = (m)    => console.log('[earnings-fix]', m);
-  const warn = (m)    => console.warn('[earnings-fix]', m);
-  const _db  = ()     => window.db || null;
-  const _cu  = ()     => window.currentUser || null;
-  const _fmt = (v)    => typeof window.formatCurrency === 'function'
+  /* ── Shared helpers ── */
+  const log  = (m) => console.log('[sportobook-fix]', m);
+  const warn = (m) => console.warn('[sportobook-fix]', m);
+  const _db  = ()  => window.db || null;
+  const _cu  = ()  => window.currentUser || null;
+  const _fmt = (v) => typeof window.formatCurrency === 'function'
     ? window.formatCurrency(v || 0)
     : '₹' + Number(v || 0).toLocaleString('en-IN');
-  const _esc = (s)    => String(s || '')
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const _esc = (s) => String(s || '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   function _isoDate(offsetDays) {
     return new Date(Date.now() - offsetDays * 86400000).toISOString().split('T')[0];
   }
-  function _fmtDate(ts) {
-    if (!ts) return '—';
-    const d = ts.toDate ? ts.toDate() : new Date(ts);
-    return d.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
-  }
+
 
   /* ══════════════════════════════════════════════════════════════
-     STEP 1 — Authoritative earnings renderer
-     Identical logic to combined_patches.js Section 6, kept here as
-     a self-contained fallback that can never be clobbered.
+     FIX 4 — showPage('my-bookings-page') → 'bookings-page'
+     Applied first (no async needed) so every subsequent navigation
+     — including those triggered by the earnings renderer — works.
+  ══════════════════════════════════════════════════════════════ */
+  function patchShowPage() {
+    if (!window.showPage) { setTimeout(patchShowPage, 200); return; }
+    if (window.__myBookingsPageFixed) return;
+
+    const _origShowPage = window.showPage;
+    window.showPage = function patchedShowPage(pageId) {
+      if (pageId === 'my-bookings-page') {
+        log('Redirected my-bookings-page → bookings-page');
+        pageId = 'bookings-page';
+      }
+      return _origShowPage.apply(this,
+        arguments.length === 1 ? [pageId] : [pageId, ...Array.prototype.slice.call(arguments, 1)]);
+    };
+
+    window.__myBookingsPageFixed = true;
+    log('✅ FIX 4 — showPage patched, my-bookings-page remapped');
+  }
+
+
+  /* ══════════════════════════════════════════════════════════════
+     FIX 1-3 — Authoritative earnings balance calculator
   ══════════════════════════════════════════════════════════════ */
   async function computeRealBalance(ownerId) {
     const db = _db();
     if (!db || !ownerId) {
-      return { earned:0, groundEarned:0, poolEarned:0, tournamentEarned:0,
-               received:0, locked:0, available:0, pendingRequests:[] };
+      return { earned: 0, groundEarned: 0, poolEarned: 0, tournamentEarned: 0,
+               received: 0, locked: 0, available: 0, pendingRequests: [] };
     }
 
-    /* ── Ground bookings (ALL confirmed, ownerAmount fallback to 90%) ── */
+    /* ── Ground bookings (ALL confirmed; fallback ownerAmount = 90%) ── */
     const gSnap = await db.collection('bookings')
       .where('ownerId', '==', ownerId)
       .where('bookingStatus', '==', 'confirmed')
-      .get().catch(() => ({ docs:[] }));
+      .get().catch(() => ({ docs: [] }));
 
     let groundEarned = 0;
     gSnap.docs.forEach(d => {
@@ -81,10 +99,10 @@
       groundEarned += amt > 0 ? amt : Math.floor(Number(data.amount || data.totalAmount || 0) * 0.9);
     });
 
-    /* ── Pool bookings — deduplicate across both status field names ── */
+    /* ── Pool bookings — query BOTH status fields, deduplicate ── */
     const [pByStatus, pByBookingStatus] = await Promise.all([
-      db.collection('pool_bookings').where('ownerId','==',ownerId).where('status','==','confirmed').get().catch(()=>({docs:[]})),
-      db.collection('pool_bookings').where('ownerId','==',ownerId).where('bookingStatus','==','confirmed').get().catch(()=>({docs:[]})),
+      db.collection('pool_bookings').where('ownerId', '==', ownerId).where('status', '==', 'confirmed').get().catch(() => ({ docs: [] })),
+      db.collection('pool_bookings').where('ownerId', '==', ownerId).where('bookingStatus', '==', 'confirmed').get().catch(() => ({ docs: [] })),
     ]);
     let poolEarned = 0;
     const seenPool = new Set();
@@ -99,12 +117,13 @@
     /* ── Tournament earnings ── */
     let tournamentEarned = 0;
     try {
-      const tSnap = await db.collection('tournaments').where('ownerId','==',ownerId).get().catch(()=>({docs:[]}));
+      const tSnap = await db.collection('tournaments').where('ownerId', '==', ownerId).get().catch(() => ({ docs: [] }));
       if (!tSnap.empty) {
         const ids = tSnap.docs.map(d => d.id);
         for (let i = 0; i < ids.length; i += 30) {
-          const chunk  = ids.slice(i, i + 30);
-          const eSnap  = await db.collection('tournament_entries').where('tournamentId','in',chunk).get().catch(()=>({docs:[]}));
+          const eSnap = await db.collection('tournament_entries')
+            .where('tournamentId', 'in', ids.slice(i, i + 30))
+            .get().catch(() => ({ docs: [] }));
           eSnap.docs.forEach(d => {
             const e = d.data();
             if (e.status !== 'confirmed' && e.paymentStatus !== 'paid') return;
@@ -118,8 +137,8 @@
 
     /* ── Already received: owner_payments + paid payout_requests (deduped) ── */
     const [opSnap, ppSnap] = await Promise.all([
-      db.collection('owner_payments').where('ownerId','==',ownerId).get().catch(()=>({docs:[]})),
-      db.collection('payout_requests').where('ownerId','==',ownerId).where('status','==','paid').get().catch(()=>({docs:[]})),
+      db.collection('owner_payments').where('ownerId', '==', ownerId).get().catch(() => ({ docs: [] })),
+      db.collection('payout_requests').where('ownerId', '==', ownerId).where('status', '==', 'paid').get().catch(() => ({ docs: [] })),
     ]);
     let totalReceived = 0;
     const seenReceived = new Set();
@@ -132,11 +151,11 @@
       totalReceived += Number(d.data().amount || 0);
     });
 
-    /* ── Locked in pending/approved requests ── */
+    /* ── Locked in pending/approved payout requests ── */
     const pendSnap = await db.collection('payout_requests')
-      .where('ownerId','==',ownerId)
-      .where('status','in',['pending','approved'])
-      .get().catch(()=>({docs:[]}));
+      .where('ownerId', '==', ownerId)
+      .where('status', 'in', ['pending', 'approved'])
+      .get().catch(() => ({ docs: [] }));
     let totalLocked = 0;
     const pendingRequests = [];
     pendSnap.docs.forEach(d => {
@@ -163,19 +182,19 @@
     try {
       const bal = await computeRealBalance(cu.uid);
 
-      /* period stats from ground bookings only (fast, already fetched) */
+      /* Period stats (ground bookings only — fast) */
       const today = _isoDate(0), week = _isoDate(6), month = _isoDate(29);
       let todayE = 0, weekE = 0, monthE = 0;
       const bSnap = await db.collection('bookings')
-        .where('ownerId','==',cu.uid)
-        .where('bookingStatus','==','confirmed')
-        .get().catch(()=>({docs:[]}));
+        .where('ownerId', '==', cu.uid)
+        .where('bookingStatus', '==', 'confirmed')
+        .get().catch(() => ({ docs: [] }));
       bSnap.docs.forEach(d => {
         const b   = d.data();
         const amt = Number(b.ownerAmount) || Math.floor(Number(b.amount || 0) * 0.9);
-        if (b.date === today) todayE  += amt;
-        if (b.date >= week)   weekE   += amt;
-        if (b.date >= month)  monthE  += amt;
+        if (b.date === today) todayE += amt;
+        if (b.date >= week)   weekE  += amt;
+        if (b.date >= month)  monthE += amt;
       });
 
       if (typeof window.hideLoading === 'function') window.hideLoading();
@@ -192,7 +211,7 @@
       container.innerHTML = `
         <!-- Period stats -->
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
-          ${[['Today',todayE],['This Week',weekE],['This Month',monthE]].map(([label,val])=>`
+          ${[['Today', todayE], ['This Week', weekE], ['This Month', monthE]].map(([label, val]) => `
             <div style="background:#f0f4ff;border-radius:12px;padding:12px;text-align:center;">
               <div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;">${label}</div>
               <div style="font-size:18px;font-weight:800;color:#2563eb;">${_fmt(val)}</div>
@@ -203,13 +222,13 @@
         <div style="background:linear-gradient(135deg,#1b2e6c,#2563eb);border-radius:16px;padding:20px;margin-bottom:16px;color:#fff;">
           <div style="font-size:12px;opacity:.8;margin-bottom:6px;"><i class="fas fa-wallet"></i> Available to Withdraw</div>
           <div style="font-size:34px;font-weight:800;letter-spacing:-0.6px;margin-bottom:4px;">${_fmt(bal.available)}</div>
-          <div style="font-size:11px;opacity:.7;">Total earned minus received & pending</div>
+          <div style="font-size:11px;opacity:.7;">Total earned minus received &amp; pending</div>
           <div style="margin-top:12px;background:rgba(255,255,255,.12);border-radius:10px;padding:10px 12px;">
             <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
               <span style="font-size:12px;opacity:.85;">Total Earned</span>
               <span style="font-size:13px;font-weight:700;">${_fmt(bal.earned)}</span>
             </div>
-            <div style="display:flex;justify-content:space-between;margin-bottom:${bal.locked > 0 ? '6px':'0'};">
+            <div style="display:flex;justify-content:space-between;margin-bottom:${bal.locked > 0 ? '6px' : '0'};">
               <span style="font-size:12px;opacity:.85;">Already Received</span>
               <span style="font-size:13px;font-weight:700;color:#86efac;">− ${_fmt(bal.received)}</span>
             </div>
@@ -225,7 +244,7 @@
           </div>
         </div>
 
-        <!-- Breakdown -->
+        <!-- Earnings breakdown -->
         <div style="background:#fff;border:1.5px solid #e8edf8;border-radius:14px;padding:14px;margin-bottom:16px;">
           <div style="font-size:13px;font-weight:800;color:#0f1f5c;margin-bottom:10px;"><i class="fas fa-chart-bar" style="color:#2563eb;margin-right:6px;"></i>Earnings Breakdown</div>
           <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f4ff;">
@@ -294,40 +313,32 @@
     }
   }
 
+
   /* ══════════════════════════════════════════════════════════════
-     STEP 2 — Patch loadOwnerDashboard to use window.loadOwnerEarnings
-     at CALL TIME (not captured at declaration time).
-     This breaks the JS function-scope lock that prevented patches
-     from paymentService.js / combined_patches.js from taking effect.
+     FIX 1 — Patch loadOwnerDashboard to resolve window.loadOwnerEarnings
+     at call-time, breaking the JS local-scope lock in app.js.
   ══════════════════════════════════════════════════════════════ */
   function patchDashboardRouter() {
-    if (!window.loadOwnerDashboard) {
-      setTimeout(patchDashboardRouter, 300);
-      return;
-    }
+    if (!window.loadOwnerDashboard) { setTimeout(patchDashboardRouter, 300); return; }
     if (window.__efRouterPatched) return;
 
     const _origDash = window.loadOwnerDashboard;
     window.loadOwnerDashboard = async function (tab) {
-      /* For earnings and payouts, always use the window-level function
-         so every patch that writes window.loadOwnerEarnings is respected. */
       if (tab === 'earnings') {
         const container = document.getElementById('owner-dashboard-content');
         if (!container) return;
 
-        /* Highlight tab */
         document.querySelectorAll('.dashboard-tabs .tab-btn').forEach(b => b.classList.remove('active'));
         const tabEl = document.getElementById('owner-earnings-tab');
         if (tabEl) tabEl.classList.add('active');
 
         container.innerHTML = '<div class="loading-spinner"><div class="loader-spinner"></div></div>';
 
-        /* Resolve the LATEST registered earnings function at call-time */
         const fn = window.loadOwnerEarnings;
         if (typeof fn === 'function') {
           try { await fn(container); } catch (e) { warn('earnings fn error: ' + e.message); }
         } else {
-          warn('window.loadOwnerEarnings not found, using built-in renderer');
+          warn('window.loadOwnerEarnings not found — using built-in renderer');
           await renderEarningsTab(container);
         }
         return;
@@ -336,12 +347,12 @@
     };
 
     window.__efRouterPatched = true;
-    log('✅ loadOwnerDashboard patched — earnings tab now uses window.loadOwnerEarnings at call-time');
+    log('✅ FIX 1 — loadOwnerDashboard patched, earnings uses window ref at call-time');
   }
 
+
   /* ══════════════════════════════════════════════════════════════
-     STEP 3 — Install our renderer as window.loadOwnerEarnings
-     (overwrites previous patches & keeps being the freshest version)
+     Install — set all window references to our authoritative renderer
   ══════════════════════════════════════════════════════════════ */
   function install() {
     window.loadOwnerEarnings         = renderEarningsTab;
@@ -352,28 +363,24 @@
         || document.getElementById('owner-earnings-content');
       if (c) renderEarningsTab(c).catch(console.error);
     };
-    window._efComputeRealBalance = computeRealBalance; // expose for debugging
+    window._efComputeRealBalance = computeRealBalance;
     window._pspEarningsPatched   = true;
     window._gefInstalled         = true;
-    log('✅ window.loadOwnerEarnings installed');
+    log('✅ FIX 2-3 — window.loadOwnerEarnings installed');
   }
 
+
   /* ══════════════════════════════════════════════════════════════
-     STEP 4 — Auto-refresh wiring
+     Auto-refresh wiring
   ══════════════════════════════════════════════════════════════ */
   function wireRefreshEvents() {
-    /* Re-render after a confirmed payment */
     window.addEventListener('bmg:paymentConfirmed', function () {
       setTimeout(() => {
         const c = document.getElementById('owner-dashboard-content')
                || document.getElementById('owner-earnings-content');
-        if (c && c.closest('[style*="display: none"]') === null) {
-          renderEarningsTab(c).catch(() => {});
-        }
+        if (c) renderEarningsTab(c).catch(() => {});
       }, 3000);
     });
-
-    /* Re-render on explicit refresh event */
     window.addEventListener('bmg:earningsNeedRefresh', function () {
       setTimeout(() => {
         const c = document.getElementById('owner-dashboard-content')
@@ -383,28 +390,30 @@
     });
   }
 
-  /* ── Boot ── */
-  install();
-  patchDashboardRouter();
+
+  /* ── Boot — all four fixes ── */
+  patchShowPage();       // FIX 4 — runs immediately, no async needed
+  install();             // FIX 2-3
+  patchDashboardRouter(); // FIX 1
   wireRefreshEvents();
 
-  /* Re-install at key moments to survive late overwrites from other patch files */
+  /* Re-install at staggered intervals to survive late patch overwrites */
   setTimeout(install, 200);
   setTimeout(install, 600);
   setTimeout(install, 1500);
   setTimeout(patchDashboardRouter, 400);
+  setTimeout(patchShowPage, 300);   // re-apply if showPage was overwritten late
 
-  /* MutationObserver: re-install if dashboard DOM changes */
+  /* MutationObserver: re-install if owner dashboard DOM changes */
   function attachObserver() {
     const el = document.getElementById('owner-dashboard-page');
     if (!el) { setTimeout(attachObserver, 500); return; }
-    const obs = new MutationObserver(() => {
+    new MutationObserver(() => {
       if (window.loadOwnerEarnings !== renderEarningsTab) install();
-    });
-    obs.observe(el, { childList: true, subtree: true });
+    }).observe(el, { childList: true, subtree: true });
     log('MutationObserver attached to owner-dashboard-page');
   }
   setTimeout(attachObserver, 300);
 
-  log('earnings_fix_final.js loaded ✅');
+  log('earnings_fix_final.js loaded ✅ (4 fixes active)');
 })();
