@@ -815,6 +815,10 @@ window.recoverPaymentSession              = recoverPaymentSession;
         const bookings = [];
         bookingSnap.forEach(doc => {
           const b   = doc.data();
+          // IMPORTANT: Skip bookings that have been paid out (payout_done status)
+          const payoutStatus = b.payoutStatus || 'pending';
+          if (payoutStatus === 'payout_done') return; // Skip already paid-out bookings
+          
           const amt = b.ownerAmount || 0;
           bTotalE += amt;
           if (b.date === today)     bTodayE += amt;
@@ -828,6 +832,10 @@ window.recoverPaymentSession              = recoverPaymentSession;
         const poolBookings = [];
         (poolBookingSnap.docs || []).forEach(doc => {
           const p   = doc.data();
+          // IMPORTANT: Skip pool bookings that have been paid out (payout_done status)
+          const payoutStatus = p.payoutStatus || 'pending';
+          if (payoutStatus === 'payout_done') return; // Skip already paid-out pool bookings
+          
           const amt = p.ownerAmount || 0;
           pTotalE += amt;
           if (p.date === today)     pTodayE += amt;
@@ -860,6 +868,11 @@ window.recoverPaymentSession              = recoverPaymentSession;
             tEntries.docs.forEach(doc => {
               const e   = doc.data();
               if (e.status !== 'confirmed' && e.paymentStatus !== 'paid') return;
+              
+              // IMPORTANT: Skip tournament entries that have been paid out (payout_done status)
+              const payoutStatus = e.payoutStatus || 'pending';
+              if (payoutStatus === 'payout_done') return; // Skip already paid-out entries
+              
               const amt  = e.ownerAmount || Math.round((e.amount || 0) * 0.80); // 20% platform fee
               const date = e.date || '';
               tTotalE += amt;
