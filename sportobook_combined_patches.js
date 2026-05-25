@@ -1029,7 +1029,7 @@
     for (const key of ['pendingBooking','pendingCashfreeBooking','currentBookingDetails']) {
       try {
         const v = sessionStorage.getItem(key);
-        if (v) { const p = JSON.parse(v); if (p && p.groundId) return p; }
+        if (v) { const p = JSON.parse(v); if (p && (p.groundId || p.poolId || p.isPoolBooking)) return p; }
       } catch (_) {}
     }
     return null;
@@ -1062,6 +1062,13 @@
   async function finaliseGroundBooking(orderId, data) {
     const db = _db();
     if (!db) { _warn('db not ready'); return; }
+
+    /* ── Guard: never run ground finaliser for pool bookings ── */
+    const _earlyPool = data && (data.isPoolBooking || data.poolId);
+    if (_earlyPool) {
+      _warn('finaliseGroundBooking called for pool booking — skipping to prevent double earnings. orderId:', orderId);
+      return;
+    }
 
     /* ── Resolve booking data ── */
     let bData = data || {};
@@ -1411,15 +1418,36 @@
       }
     }
 
-    /* ── 3. Increment owner earnings ─────────────────────────────── */
-    if (ownerId && ownerAmt > 0) {
+    /* ── 3. Increment owner earnings (idempotent — guarded by earningsIncremented flag) ── */
+    if (ownerId && ownerAmt > 0 && bookingDocId) {
       try {
-        await db.collection('owners').doc(ownerId).update({
-          totalEarnings : _inc(ownerAmt),
-          totalBookings : _inc(1),
-          updatedAt     : _ts(),
+        // Atomically: check earningsIncremented flag, set it, and increment owner earnings
+        // in a single Firestore transaction to prevent double-counting if this function
+        // is called more than once (race between multiple paymentConfirmed listeners).
+        const bookingRef = db.collection('pool_bookings').doc(bookingDocId);
+        const ownerRef   = db.collection('owners').doc(ownerId);
+        let alreadyDone  = false;
+
+        await db.runTransaction(async (tx) => {
+          const snap = await tx.get(bookingRef);
+          if (snap.exists && snap.data().earningsIncremented === true) {
+            alreadyDone = true;
+            return; // already incremented — abort without writing
+          }
+          // Set flag + increment earnings atomically
+          tx.update(bookingRef, { earningsIncremented: true, updatedAt: _ts() });
+          tx.update(ownerRef, {
+            totalEarnings : _inc(ownerAmt),
+            totalBookings : _inc(1),
+            updatedAt     : _ts(),
+          });
         });
-        _log('✅ Owner pool earnings incremented +₹' + ownerAmt);
+
+        if (alreadyDone) {
+          _log('Owner pool earnings already incremented for', bookingDocId, '— skipping duplicate');
+        } else {
+          _log('✅ Owner pool earnings incremented +₹' + ownerAmt);
+        }
       } catch (err) {
         _warn('Owner pool earnings increment failed:', err.message);
       }
@@ -1457,7 +1485,9 @@
     if (paymentType === 'booking') {
       // Determine ground vs pool
       const pending = _getPending();
-      if (pending && pending.isPoolBooking) {
+      // Check both sessionStorage pending data AND event detail for pool booking signals
+      const isPool = (pending && pending.isPoolBooking) || data.isPoolBooking || data.poolId || (pending && pending.poolId);
+      if (isPool) {
         await finalisePoolBooking(orderId, e.detail);
       } else {
         await finaliseGroundBooking(orderId, { ...data, ...( pending || {}) });
