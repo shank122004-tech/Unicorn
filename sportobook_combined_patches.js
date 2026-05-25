@@ -2767,19 +2767,19 @@
       groundEarned += amt > 0 ? amt : Math.floor(Number(data.amount || data.totalAmount || 0) * 0.93);
     });
 
-    /* ── 2. Pool bookings (deduplicated across status fields) ── */
-    const [pByStatus, pByBookingStatus] = await Promise.all([
-      db.collection('pool_bookings').where('ownerId','==',ownerId).where('status','==','confirmed').get().catch(() => ({ docs: [] })),
-      db.collection('pool_bookings').where('ownerId','==',ownerId).where('bookingStatus','==','confirmed').get().catch(() => ({ docs: [] })),
-    ]);
+    /* ── 2. Pool bookings — FIXED: Query only status='confirmed' (no double-query to prevent duplicate count) ── */
+    // NOTE: We set BOTH status AND bookingStatus to 'confirmed', so we only need to query ONE field
+    // Double-querying caused same document to be counted twice before deduplication
+    const pByStatus = await db.collection('pool_bookings')
+      .where('ownerId','==',ownerId)
+      .where('status','==','confirmed')
+      .get().catch(() => ({ docs: [] }));
+    
     let poolEarned = 0;
-    const seenPool = new Set();
-    [...pByStatus.docs, ...pByBookingStatus.docs].forEach(d => {
-      if (seenPool.has(d.id)) return;
-      seenPool.add(d.id);
+    pByStatus.docs.forEach(d => {
       const data = d.data();
-      // CRITICAL FIX: skip pool bookings already paid out OR locked in a pending payout request.
-      if (data.payoutStatus === 'payout_done') return; // only exclude fully-transferred bookings from earned total
+      // CRITICAL FIX: skip pool bookings already paid out
+      if (data.payoutStatus === 'payout_done') return;
       const amt  = Number(data.ownerAmount);
       poolEarned += amt > 0 ? amt : Math.floor(Number(data.amount || 0) * 0.93);
     });
@@ -3433,19 +3433,15 @@
       groundEarned += amt > 0 ? amt : Math.floor(Number(data.amount || data.totalAmount || 0) * 0.93);
     });
 
-    /* ── 2. Pool bookings — triple-net query to catch all confirmed states ── */
-    const [pByStatus, pByBookingStatus, pByPayment] = await Promise.all([
-      db.collection('pool_bookings').where('ownerId','==',ownerId).where('status','==','confirmed')
-        .get().catch(() => ({ docs: [] })),
-      db.collection('pool_bookings').where('ownerId','==',ownerId).where('bookingStatus','==','confirmed')
-        .get().catch(() => ({ docs: [] })),
-      db.collection('pool_bookings').where('ownerId','==',ownerId).where('paymentStatus','==','success')
-        .get().catch(() => ({ docs: [] })),
-    ]);
+    /* ── 2. Pool bookings — FIXED: Query only confirmed status (no triple-net to prevent double-count) ── */
+    // NOTE: We set BOTH status AND bookingStatus to 'confirmed', so we only need to query one
+    // Triple-net queries caused double-counting when same document matched multiple fields
+    const pByStatus = await db.collection('pool_bookings').where('ownerId','==',ownerId).where('status','==','confirmed')
+      .get().catch(() => ({ docs: [] }));
 
     let poolEarned = 0;
     const seenPool = new Set();
-    [...pByStatus.docs, ...pByBookingStatus.docs, ...pByPayment.docs].forEach(d => {
+    pByStatus.docs.forEach(d => {
       if (seenPool.has(d.id)) return;
       seenPool.add(d.id);
       const data = d.data();
