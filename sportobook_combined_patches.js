@@ -1281,102 +1281,19 @@
     if (!ownerAmt && amount > 0) ownerAmt = Math.floor(amount * 0.93);
     const platformAmt = amount - ownerAmt;
 
-    // Use orderId from detail or pending
-    const bookingDocId = orderId || pending.orderId || pending.bookingId || '';
+    // Use the original bookingId written to Firestore at booking-init time (PBK_...) first.
+    // The payment gateway orderId (BMG_BOOKING_...) is a different ID and would create a
+    // duplicate pool_bookings doc if used as the Firestore doc key.
+    const bookingDocId = pending.bookingId || pending.orderId || orderId || '';
 
     _log('finalisePoolBooking →', { bookingDocId, slotId, ownerId, ownerAmt });
 
-    /* ── 1. Update pool_slots member count + pool_bookings status ── */
-    if (slotId && bookingDocId) {
-      try {
-        await db.runTransaction(async (tx) => {
-          const slotRef    = db.collection('pool_slots').doc(slotId);
-          const bookingRef = db.collection('pool_bookings').doc(bookingDocId);
-
-          const [slotDoc, bookingDoc] = await Promise.all([
-            tx.get(slotRef),
-            tx.get(bookingRef),
-          ]);
-
-          if (slotDoc.exists) {
-            const d   = slotDoc.data();
-            const max = d.maxMembers || 50;
-            const cur = (d.currentMembers || 0) + 1;
-            tx.update(slotRef, {
-              currentMembers : cur,
-              status         : cur >= max ? 'full' : 'available',
-              updatedAt      : _ts(),
-            });
-          }
-
-          if (bookingDoc.exists) {
-            tx.update(bookingRef, {
-              status        : 'confirmed',
-              bookingStatus : 'confirmed',
-              paymentStatus : 'success',
-              ownerAmount   : ownerAmt,
-              platformFee   : platformAmt,
-              confirmedAt   : _ts(),
-              updatedAt     : _ts(),
-            });
-          } else {
-            // Create the pool_bookings doc if missing
-            tx.set(bookingRef, {
-              bookingId     : bookingDocId,
-              orderId       : bookingDocId,
-              userId        : pending.userId || (_cu() && _cu().uid) || '',
-              ownerId,
-              poolId,
-              slotId,
-              date          : pending.date || '',
-              slotTime      : pending.slotTime || '',
-              amount,
-              ownerAmount   : ownerAmt,
-              platformFee   : platformAmt,
-              status        : 'confirmed',
-              bookingStatus : 'confirmed',
-              paymentStatus : 'success',
-              confirmedAt   : _ts(),
-              createdAt     : _ts(),
-              updatedAt     : _ts(),
-            }, { merge: true });
-          }
-        });
-        _log('✅ Pool slot & booking updated after payment');
-      } catch (err) {
-        _warn('Pool transaction failed — retrying without transaction:', err.message);
-        // Fallback: individual writes
-        try {
-          if (slotId) {
-            const slotDoc = await db.collection('pool_slots').doc(slotId).get();
-            if (slotDoc.exists) {
-              const d = slotDoc.data();
-              const max = d.maxMembers || 50;
-              const cur = (d.currentMembers || 0) + 1;
-              await db.collection('pool_slots').doc(slotId).update({
-                currentMembers : cur,
-                status         : cur >= max ? 'full' : 'available',
-                updatedAt      : _ts(),
-              });
-            }
-          }
-          if (bookingDocId) {
-            await db.collection('pool_bookings').doc(bookingDocId).set({
-              status        : 'confirmed',
-              bookingStatus : 'confirmed',
-              paymentStatus : 'success',
-              ownerAmount   : ownerAmt,
-              platformFee   : platformAmt,
-              confirmedAt   : _ts(),
-              updatedAt     : _ts(),
-            }, { merge: true });
-          }
-        } catch (e2) {
-          _warn('Pool fallback write also failed:', e2.message);
-        }
-      }
-    } else if (bookingDocId) {
-      // No slotId — just confirm the booking
+    /* ── 1a. Confirm pool_bookings doc status ──────────────────────────────── */
+    // We update the booking doc ONLY (no transaction involving pool_bookings,
+    // because Firestore rules require resource.data.userId == auth.uid for
+    // individual-doc reads, which fails in a transaction for newly-created docs).
+    // The slot (pool_slots) is handled in a SEPARATE transaction below.
+    if (bookingDocId) {
       try {
         await db.collection('pool_bookings').doc(bookingDocId).set({
           status        : 'confirmed',
@@ -1384,12 +1301,73 @@
           paymentStatus : 'success',
           ownerAmount   : ownerAmt,
           platformFee   : platformAmt,
+          ownerId,
+          poolId        : poolId || pending.poolId || '',
+          slotId        : slotId || '',
+          paymentOrderId: orderId || '',
           confirmedAt   : _ts(),
           updatedAt     : _ts(),
         }, { merge: true });
-        _log('✅ Pool booking confirmed (no slot update needed)');
+        _log('✅ Pool booking doc confirmed:', bookingDocId);
       } catch (err) {
         _warn('Pool booking confirm failed:', err.message);
+      }
+    }
+
+    /* ── 1b. Increment pool_slots currentMembers (idempotent via slotMemberKey) ── */
+    // We guard against double-increment by storing a per-booking key in the slot doc.
+    // If bookingDocId already appears in slot.confirmedBookingIds, skip the increment.
+    if (slotId && bookingDocId) {
+      try {
+        await db.runTransaction(async (tx) => {
+          const slotRef  = db.collection('pool_slots').doc(slotId);
+          const slotDoc  = await tx.get(slotRef);
+          if (!slotDoc.exists) return;
+
+          const d    = slotDoc.data();
+          const already = Array.isArray(d.confirmedBookingIds) && d.confirmedBookingIds.includes(bookingDocId);
+          if (already) {
+            _log('Slot member already counted for', bookingDocId, '— skipping duplicate increment');
+            return;
+          }
+
+          const max = d.maxMembers || 50;
+          const cur = (d.currentMembers || 0) + 1;
+          const FieldValue = window.firebase && window.firebase.firestore && window.firebase.firestore.FieldValue;
+          const arrUnion   = FieldValue && FieldValue.arrayUnion ? FieldValue.arrayUnion(bookingDocId) : [bookingDocId];
+          tx.update(slotRef, {
+            currentMembers    : cur,
+            status            : cur >= max ? 'full' : 'available',
+            confirmedBookingIds: arrUnion,
+            updatedAt         : _ts(),
+          });
+        });
+        _log('✅ Pool slot currentMembers incremented for', bookingDocId);
+      } catch (err) {
+        _warn('Pool slot transaction failed:', err.message);
+        // Fallback without idempotency guard (best-effort)
+        try {
+          const slotDoc = await db.collection('pool_slots').doc(slotId).get();
+          if (slotDoc.exists) {
+            const d = slotDoc.data();
+            const already = Array.isArray(d.confirmedBookingIds) && d.confirmedBookingIds.includes(bookingDocId);
+            if (!already) {
+              const max = d.maxMembers || 50;
+              const cur = (d.currentMembers || 0) + 1;
+              const FieldValue = window.firebase && window.firebase.firestore && window.firebase.firestore.FieldValue;
+              const arrUnion   = FieldValue && FieldValue.arrayUnion ? FieldValue.arrayUnion(bookingDocId) : [bookingDocId];
+              await db.collection('pool_slots').doc(slotId).update({
+                currentMembers    : cur,
+                status            : cur >= max ? 'full' : 'available',
+                confirmedBookingIds: arrUnion,
+                updatedAt         : _ts(),
+              });
+              _log('✅ Pool slot updated (fallback) for', bookingDocId);
+            }
+          }
+        } catch (e2) {
+          _warn('Pool slot fallback also failed:', e2.message);
+        }
       }
     }
 
@@ -1418,40 +1396,14 @@
       }
     }
 
-    /* ── 3. Increment owner earnings (idempotent — guarded by earningsIncremented flag) ── */
-    if (ownerId && ownerAmt > 0 && bookingDocId) {
-      try {
-        // Atomically: check earningsIncremented flag, set it, and increment owner earnings
-        // in a single Firestore transaction to prevent double-counting if this function
-        // is called more than once (race between multiple paymentConfirmed listeners).
-        const bookingRef = db.collection('pool_bookings').doc(bookingDocId);
-        const ownerRef   = db.collection('owners').doc(ownerId);
-        let alreadyDone  = false;
-
-        await db.runTransaction(async (tx) => {
-          const snap = await tx.get(bookingRef);
-          if (snap.exists && snap.data().earningsIncremented === true) {
-            alreadyDone = true;
-            return; // already incremented — abort without writing
-          }
-          // Set flag + increment earnings atomically
-          tx.update(bookingRef, { earningsIncremented: true, updatedAt: _ts() });
-          tx.update(ownerRef, {
-            totalEarnings : _inc(ownerAmt),
-            totalBookings : _inc(1),
-            updatedAt     : _ts(),
-          });
-        });
-
-        if (alreadyDone) {
-          _log('Owner pool earnings already incremented for', bookingDocId, '— skipping duplicate');
-        } else {
-          _log('✅ Owner pool earnings incremented +₹' + ownerAmt);
-        }
-      } catch (err) {
-        _warn('Owner pool earnings increment failed:', err.message);
-      }
-    }
+    /* ── 3. Owner earnings counter — SKIPPED for client writes ──────────────────── */
+    // The earnings tab (computeRealBalanceV4) derives poolEarned by querying
+    // pool_bookings where status='confirmed' and summing ownerAmount fields.
+    // Writing owners.totalEarnings from the client too caused double-counting
+    // because that counter was ALSO read by some older renderers.
+    // We intentionally do NOT increment owners.totalEarnings here;
+    // the confirmed pool_bookings doc written in step 1 is the single source of truth.
+    _log('✅ Pool earnings reflected via confirmed pool_bookings doc — no owners counter write needed.');
 
     /* ── 4. Trigger earnings refresh ─────────────────────────────── */
     window.dispatchEvent(new CustomEvent('bmg:earningsNeedRefresh'));
